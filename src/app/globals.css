@@ -1,0 +1,332 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground: #f6f1e8;
+  --background: #07090f;
+  --surface: rgba(17, 20, 30, 0.68);
+  --surface-strong: rgba(25, 29, 42, 0.9);
+  --line: rgba(230, 206, 151, 0.26);
+  --muted: #b3a58b;
+  --accent: #ebc87a;
+  --accent-strong: #f7df9d;
+  --danger: #ff7d8f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  color: var(--foreground);
+  background:
+    radial-gradient(1000px 700px at 8% 8%, rgba(151, 106, 255, 0.2), transparent 60%),
+    radial-gradient(900px 620px at 100% 0%, rgba(47, 171, 255, 0.16), transparent 58%),
+    radial-gradient(1000px 700px at 52% 100%, rgba(235, 200, 122, 0.13), transparent 62%),
+    var(--background);
+  font-feature-settings: "ss01" 1, "cv11" 1;
+  text-rendering: optimizeLegibility;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.03) 0%,
+    rgba(255, 255, 255, 0.01) 40%,
+    rgba(0, 0, 0, 0.08) 100%
+  );
+  z-index: -2;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: 3px 3px;
+  opacity: 0.06;
+  z-index: -1;
+}
+
+::selection {
+  background: rgba(247, 223, 157, 0.3);
+  color: #ffffff;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(247, 223, 157, 0.5), rgba(122, 91, 41, 0.75));
+  border-radius: 999px;
+  border: 2px solid rgba(7, 9, 15, 0.85);
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.page-shell {
+  min-height: 100vh;
+  position: relative;
+}
+
+.app-container {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 1120px;
+  padding-inline: 1rem;
+}
+
+/* 丘比小镇：浅色背景上覆盖全站浅色字样式，否则标题/副标题与背景融为一体 */
+.town-on-light .luxury-title {
+  color: #0f172a;
+}
+
+.town-on-light .luxury-subtitle {
+  color: #475569;
+}
+
+/* 小镇页深色玻璃卡内仍用全站浅色字 */
+.town-on-light .glass-card .luxury-title {
+  color: #f7f2e9;
+}
+
+.town-on-light .glass-card .luxury-subtitle {
+  color: #b3a58b;
+}
+
+.glass-card {
+  border: 1px solid var(--line);
+  background: linear-gradient(145deg, rgba(24, 28, 42, 0.8), rgba(16, 19, 30, 0.62));
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(18px);
+}
+
+.luxury-title {
+  color: #f7f2e9;
+  letter-spacing: 0.02em;
+}
+
+.luxury-subtitle {
+  color: var(--muted);
+}
+
+.luxury-btn {
+  border: 1px solid rgba(247, 223, 157, 0.35);
+  background: linear-gradient(120deg, #7f5f29 0%, #deb774 45%, #f5e4ad 70%, #9a7136 100%);
+  color: #111318;
+  box-shadow: 0 10px 28px rgba(247, 223, 157, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  transition: transform 220ms ease, box-shadow 220ms ease, filter 220ms ease;
+}
+
+.luxury-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.02);
+  box-shadow: 0 14px 35px rgba(247, 223, 157, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+.luxury-btn:disabled {
+  opacity: 0.62;
+  filter: grayscale(0.25);
+}
+
+.luxury-btn-secondary {
+  border: 1px solid rgba(247, 223, 157, 0.3);
+  background: rgba(13, 16, 24, 0.5);
+  color: #e9d8ad;
+  transition: background-color 180ms ease, border-color 180ms ease;
+}
+
+.luxury-btn-secondary:hover {
+  background: rgba(20, 24, 35, 0.82);
+  border-color: rgba(247, 223, 157, 0.48);
+}
+
+.luxury-input {
+  border: 1px solid rgba(230, 206, 151, 0.26);
+  background: rgba(12, 15, 24, 0.62);
+  color: #f5efe2;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.luxury-input::placeholder {
+  color: rgba(214, 197, 163, 0.56);
+}
+
+.luxury-input:focus {
+  border-color: rgba(247, 223, 157, 0.56);
+  box-shadow: 0 0 0 3px rgba(247, 223, 157, 0.14);
+  outline: none;
+}
+
+.luxury-option {
+  border: 1px solid rgba(230, 206, 151, 0.2);
+  background: rgba(12, 15, 24, 0.45);
+  color: rgba(245, 239, 229, 0.88);
+  transition: border-color 180ms ease, background 180ms ease, color 180ms ease;
+}
+
+.luxury-option:hover {
+  border-color: rgba(247, 223, 157, 0.32);
+}
+
+.luxury-option-active {
+  border-color: rgba(247, 223, 157, 0.48);
+  background: rgba(235, 200, 122, 0.12);
+  color: #f7f2e9;
+}
+
+.luxury-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 999px;
+  border: 1px solid rgba(247, 223, 157, 0.28);
+  background: rgba(235, 200, 122, 0.08);
+  color: rgba(247, 223, 157, 0.95);
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+.luxury-chip-muted {
+  border-color: rgba(230, 206, 151, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(214, 197, 163, 0.75);
+}
+
+.luxury-alert {
+  border-radius: 0.75rem;
+  border: 1px solid rgba(230, 206, 151, 0.22);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+}
+
+.luxury-alert-success {
+  border-color: rgba(52, 211, 153, 0.35);
+  background: rgba(6, 78, 59, 0.28);
+  color: rgba(209, 250, 229, 0.95);
+}
+
+.luxury-alert-error {
+  border-color: rgba(251, 113, 133, 0.4);
+  background: rgba(127, 29, 29, 0.22);
+  color: rgba(255, 228, 230, 0.95);
+}
+
+.luxury-alert-info {
+  border-color: rgba(56, 189, 248, 0.35);
+  background: rgba(12, 74, 110, 0.28);
+  color: rgba(224, 242, 254, 0.95);
+}
+
+@keyframes float {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.5; }
+  50% { transform: translate(10px, -15px) scale(1.05); opacity: 0.8; }
+}
+.animate-float {
+  animation: float 5s ease-in-out infinite;
+}
+
+/* 匹配页：自下而上飘动的心形 */
+@keyframes qiubi-heart-float {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(-10deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.5;
+  }
+  88% {
+    opacity: 0.35;
+  }
+  100% {
+    transform: translate3d(var(--heart-drift, 0px), -120vh, 0) rotate(14deg);
+    opacity: 0;
+  }
+}
+
+.qiubi-heart {
+  animation: qiubi-heart-float var(--heart-dur, 17s) ease-in-out infinite;
+  animation-delay: var(--heart-delay, 0s);
+  text-shadow: 0 0 14px rgba(251, 113, 133, 0.45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qiubi-heart {
+    animation: none !important;
+    opacity: 0.2 !important;
+    transform: translateY(-30vh) !important;
+  }
+}
+
+@keyframes qiubi-heart-left {
+  0% { transform: translateX(-90px) scale(0.85); opacity: 0; }
+  25% { opacity: 1; }
+  100% { transform: translateX(-8px) scale(1); opacity: 1; }
+}
+
+@keyframes qiubi-heart-right {
+  0% { transform: translateX(90px) scale(0.85); opacity: 0; }
+  25% { opacity: 1; }
+  100% { transform: translateX(8px) scale(1); opacity: 1; }
+}
+
+@keyframes qiubi-heart-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  55% { transform: scale(1.25); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.85; }
+}
+
+@keyframes qiubi-heart-ring {
+  0% { transform: scale(0.5); opacity: 0.7; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+.qiubi-love-collision {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qiubi-love-collision .heart-left {
+  font-size: 52px;
+  color: #fb7185;
+  text-shadow: 0 0 14px rgba(251, 113, 133, 0.5);
+  animation: qiubi-heart-left 680ms ease-out forwards;
+}
+
+.qiubi-love-collision .heart-right {
+  font-size: 52px;
+  color: #f472b6;
+  text-shadow: 0 0 14px rgba(244, 114, 182, 0.5);
+  animation: qiubi-heart-right 680ms ease-out forwards;
+}
+
+.qiubi-love-collision .heart-pop {
+  position: absolute;
+  font-size: 66px;
+  color: #f43f5e;
+  text-shadow: 0 0 20px rgba(244, 63, 94, 0.5);
+  animation: qiubi-heart-pop 520ms ease-out 620ms forwards;
+  opacity: 0;
+}
+
+.qiubi-love-collision .heart-ring {
+  position: absolute;
+  width: 88px;
+  height: 88px;
+  border-radius: 999px;
+  border: 3px solid rgba(251, 113, 133, 0.5);
+  animation: qiubi-heart-ring 680ms ease-out 700ms forwards;
+}

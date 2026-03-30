@@ -1,0 +1,295 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String   @id @default(cuid())
+  secondmeUserId    String?  @unique @map("secondme_user_id")
+  accessToken       String?  @map("access_token")
+  refreshToken      String?  @map("refresh_token")
+  tokenExpiresAt    DateTime? @map("token_expires_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  email             String?  @unique
+  passwordHash      String?  @map("password_hash")
+  authProvider      String   @default("secondme") @map("auth_provider")
+  name              String?
+  avatarUrl         String?  @map("avatar_url")
+  bio               String?
+  photo1           String?  @map("photo_1")
+  photo2           String?  @map("photo_2")
+  photo3           String?  @map("photo_3")
+  onboardingDone   Boolean  @default(true) @map("onboarding_done")
+  privacyAcceptedAt DateTime? @map("privacy_accepted_at")
+  agentLearnConsent Boolean @default(false) @map("agent_learn_consent")
+
+  sessions         Session[]
+  ownerFacts       OwnerFact[]
+  preference       UserPreference?
+  matchesAsUser    Match[]         @relation("UserMatches")
+  matchesAsTarget  Match[]         @relation("TargetUserMatches")
+  feedbacksGiven   MatchFeedback[]
+  matchReads       MatchRead[]    @relation("MatchReadUser")
+  agentChatGenerationJobs AgentChatGenerationJob[] @relation("OwnerAgentChatGenerationJobs")
+
+  townPosts TownPost[]
+  townCandidateRounds TownCandidateRound[]
+  townConversationsAsRequester TownConversation[] @relation("TownRequester")
+  townConversationsAsCandidate TownConversation[] @relation("TownCandidate")
+  townConversationReads TownConversationRead[] @relation("TownConversationReadsUser")
+  townConversationMessages TownConversationMessage[] @relation("TownConversationMessageSender")
+
+  @@map("users")
+}
+
+model OwnerFact {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  source      String   @default("manual")
+  content     String
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("owner_facts")
+}
+
+model Session {
+  id                  String   @id @default(cuid())
+  userId              String   @map("user_id")
+  secondmeSessionId   String?  @map("secondme_session_id")
+  title               String?
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model UserPreference {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  heartThreshold  Int      @default(80) @map("heart_threshold")
+  dailyMatchTime  String?  @map("daily_match_time") // "HH:mm"
+  dailyMatchTimezone String? @map("daily_match_timezone") // "Asia/Shanghai"
+  expectedGender  String?  @map("expected_gender")   // male | female | any
+  ageMin          Int?     @map("age_min")
+  ageMax          Int?     @map("age_max")
+  region          String?  @map("region")
+  matchTypes      String?  @map("match_types")       // JSON: ["恋人","旅游搭子",...]
+  keywords        String?  @map("keywords")          // 逗号分隔或 JSON
+  chatPace        String?  @map("chat_pace")         // "low" | "medium" | "high"
+  meetPreference  String?  @map("meet_preference")   // "online" | "hybrid" | "offline"
+  emotionStyle    String?  @map("emotion_style")     // "direct" | "slow" | "sensitive"
+  activityTags    String?  @map("activity_tags")     // JSON: ["一起打游戏","刷剧陪伴",...]
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId])
+  @@map("user_preferences")
+}
+
+model Match {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  targetUserId    String   @map("target_user_id")
+  status          String   @default("screening")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user        User          @relation("UserMatches", fields: [userId], references: [id], onDelete: Cascade)
+  targetUser  User          @relation("TargetUserMatches", fields: [targetUserId], references: [id], onDelete: Cascade)
+  scores      MatchScore[]
+  messages    MatchMessage[]
+  feedbacks   MatchFeedback[]
+  matchReads  MatchRead[]    @relation("MatchReadMatch")
+  agentChatGenerationJobs AgentChatGenerationJob[] @relation("MatchAgentChatGenerationJobs")
+
+  @@index([userId])
+  @@index([targetUserId])
+  @@map("matches")
+}
+
+model MatchScore {
+  id              String   @id @default(cuid())
+  matchId         String   @map("match_id")
+  totalScore      Int      @map("total_score")
+  interestScore   Int      @map("interest_score")
+  personalityScore Int     @map("personality_score")
+  valuesScore     Int      @map("values_score")
+  lifeStoryScore  Int      @map("life_story_score")
+  futureScore     Int      @map("future_score")
+  summary         String   @map("summary")
+  reportJson      String?  @map("report_json")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@index([matchId])
+  @@map("match_scores")
+}
+
+model MatchMessage {
+  id          String   @id @default(cuid())
+  matchId     String   @map("match_id")
+  senderType  String   @map("sender_type") // "agent_self" | "agent_target" | "user_self" | "user_target"
+  content     String
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@index([matchId])
+  @@map("match_messages")
+}
+
+model MatchFeedback {
+  id            String   @id @default(cuid())
+  matchId       String   @map("match_id")
+  raterUserId   String   @map("rater_user_id")
+  vibeScore     Int      @map("vibe_score")        // 聊天感觉
+  valuesScore   Int      @map("values_score")      // 价值观契合度
+  potentialScore Int     @map("potential_score")   // 未来发展潜力
+  comment       String?  @map("comment")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  rater User  @relation(fields: [raterUserId], references: [id], onDelete: Cascade)
+
+  @@index([matchId])
+  @@index([raterUserId])
+  @@map("match_feedbacks")
+}
+
+model MatchRead {
+  id          String   @id @default(cuid())
+  matchId     String   @map("match_id")
+  userId      String   @map("user_id")
+  lastReadAt  DateTime @default(now()) @map("last_read_at")
+
+  match Match @relation("MatchReadMatch", fields: [matchId], references: [id], onDelete: Cascade)
+  user  User  @relation("MatchReadUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, userId])
+  @@map("match_reads")
+}
+
+model AgentChatGenerationJob {
+  id            String   @id @default(cuid())
+  matchId       String   @unique @map("match_id")
+  ownerUserId   String   @map("owner_user_id")
+  status        String   @map("status") // "queued" | "running" | "done" | "failed" | "stopped"
+  stopReason    String?  @map("stop_reason")
+  generatedCount Int      @default(0) @map("generated_count")
+  lastTurnAt    DateTime? @map("last_turn_at")
+  errorMessage  String?  @map("error_message")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  match Match @relation("MatchAgentChatGenerationJobs", fields: [matchId], references: [id], onDelete: Cascade)
+  owner User  @relation("OwnerAgentChatGenerationJobs", fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  @@map("agent_chat_generation_jobs")
+}
+
+model TownPost {
+  id            String   @id @default(cuid())
+  userId        String   @map("user_id")
+  title         String   @map("title")
+  content       String   @map("content")
+  categoriesJson String? @map("categories_json") // JSON: ["比赛队友","创业伙伴",...]
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  author User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  candidateRounds TownCandidateRound[]
+  conversations TownConversation[]
+
+  @@index([userId])
+  @@map("town_posts")
+}
+
+model TownCandidateRound {
+  id String @id @default(cuid())
+
+  postId      String   @map("post_id")
+  requesterId String   @map("requester_id")
+
+  // 本轮生成的候选用户（JSON: ["userId1","userId2",...], 长度通常为 10）
+  candidateUserIdsJson String? @map("candidate_user_ids_json")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post TownPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  requester User @relation(fields: [requesterId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([requesterId])
+  @@map("town_candidate_rounds")
+}
+
+model TownConversation {
+  id String @id @default(cuid())
+
+  postId      String @map("post_id")
+  requesterId String @map("requester_id")
+  candidateId String @map("candidate_id")
+
+  status String @default("active") @map("status") // active|closed
+  openerMessage String? @map("opener_message")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  post TownPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  requester User @relation("TownRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  candidate User @relation("TownCandidate", fields: [candidateId], references: [id], onDelete: Cascade)
+
+  messages TownConversationMessage[]
+  reads TownConversationRead[]
+
+  @@unique([postId, requesterId, candidateId])
+  @@index([requesterId])
+  @@index([candidateId])
+  @@map("town_conversations")
+}
+
+model TownConversationMessage {
+  id String @id @default(cuid())
+
+  conversationId String @map("conversation_id")
+  senderUserId   String @map("sender_user_id")
+  content        String @map("content")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  conversation TownConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender User @relation("TownConversationMessageSender", fields: [senderUserId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("town_conversation_messages")
+}
+
+model TownConversationRead {
+  id String @id @default(cuid())
+
+  conversationId String @map("conversation_id")
+  userId         String @map("user_id")
+  lastReadAt     DateTime @default(now()) @map("last_read_at")
+
+  conversation TownConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user User @relation("TownConversationReadsUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@map("town_conversation_reads")
+}
