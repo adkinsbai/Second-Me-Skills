@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>丘比小镇 — 页面示意图（由代码结构生成，非截图）</title>
+  <style>
+    :root {
+      --header-bg: rgba(12, 17, 27, 0.88);
+      --line: rgba(252, 211, 77, 0.18);
+      --slate-900: #0f172a;
+      --slate-600: #475569;
+      --amber-50: #fffbeb;
+      --amber-100-70: rgba(254, 243, 199, 0.7);
+      --chip: rgba(251, 191, 36, 0.15);
+      --glass: rgba(15, 23, 42, 0.45);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, "PingFang SC", "Segoe UI", sans-serif;
+      background: #07090f;
+      color: #f6f1e8;
+      line-height: 1.5;
+      padding: 1.5rem 1rem 3rem;
+    }
+    .doc {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 800;
+      margin: 0 0 0.5rem;
+      letter-spacing: -0.02em;
+    }
+    .lead {
+      color: #b3a58b;
+      font-size: 0.92rem;
+      max-width: 70ch;
+      margin: 0 0 1.5rem;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      align-items: start;
+    }
+    .panel {
+      background: rgba(17, 20, 30, 0.85);
+      border: 1px solid rgba(230, 206, 151, 0.2);
+      border-radius: 14px;
+      padding: 0.75rem 0.75rem 1rem;
+    }
+    .panel h2 {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #ebc87a;
+      margin: 0 0 0.35rem;
+    }
+    .panel .route {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      font-family: ui-monospace, monospace;
+      margin-bottom: 0.75rem;
+    }
+    .panel .ref {
+      font-size: 0.72rem;
+      color: #64748b;
+      margin-top: 0.6rem;
+    }
+
+    /* 手机外框 + 小镇浅色底 */
+    .phone {
+      position: relative;
+      width: 100%;
+      max-width: 320px;
+      margin: 0 auto;
+      border-radius: 24px;
+      border: 2px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+      overflow: hidden;
+      min-height: 480px;
+    }
+    .town-canvas {
+      min-height: 480px;
+      background:
+        linear-gradient(165deg, #e0f2fe 0%, #f0f9ff 25%, #fef3c7 55%, #dbeafe 100%);
+      position: relative;
+    }
+    .town-canvas::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(80% 40% at 20% 90%, rgba(16, 185, 129, 0.12), transparent 55%),
+        radial-gradient(60% 35% at 85% 80%, rgba(244, 114, 182, 0.1), transparent 50%);
+      pointer-events: none;
+    }
+    .town-inner {
+      position: relative;
+      z-index: 1;
+      padding: 0 0 1rem;
+      min-height: 100%;
+    }
+
+    /* AppHeader 简化 */
+    .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 3.5rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--header-bg);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(12px);
+    }
+    .app-header .back {
+      color: #fde68a;
+      font-size: 0.85rem;
+    }
+    .app-header .title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #fffbeb;
+    }
+    .app-header .nav-mock {
+      display: flex;
+      gap: 0.25rem;
+      font-size: 0.55rem;
+      color: rgba(254, 243, 199, 0.5);
+      text-align: right;
+      line-height: 1.2;
+    }
+
+    .app-container {
+      padding: 0.6rem 0.85rem 0.4rem;
+    }
+    .eyebrow {
+      font-size: 0.55rem;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--slate-600);
+    }
+    .h1 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--slate-900);
+      margin: 0.35rem 0 0;
+    }
+    .sub {
+      font-size: 0.72rem;
+      color: var(--slate-600);
+      margin: 0.25rem 0 0;
+    }
+    .row-between {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.65rem;
+    }
+    .btn-light {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.4rem 0.65rem;
+      border-radius: 0.9rem;
+      border: 1px solid rgba(100, 116, 139, 0.35);
+      background: rgba(255, 255, 255, 0.82);
+      color: #1e293b;
+    }
+
+    /* 入口双卡 /town */
+    .cards-2 {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+    }
+    .card-entry {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-radius: 1.1rem;
+      border: 1px solid rgba(100, 116, 139, 0.2);
+      background: rgba(255, 255, 255, 0.88);
+      padding: 0.65rem 0.7rem;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+    }
+    .card-entry h3 {
+      margin: 0.2rem 0 0;
+      font-size: 0.88rem;
+      color: #0f172a;
+    }
+    .swatch {
+      width: 2.4rem;
+      height: 2.4rem;
+      border-radius: 0.65rem;
+      flex-shrink: 0;
+      box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.3);
+    }
+    .swatch.explore {
+      background: linear-gradient(135deg, #fecdd3, #fde68a);
+    }
+    .swatch.post {
+      background: linear-gradient(135deg, #bae6fd, #ddd6fe);
+    }
+
+    /* 分类 chip */
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      margin: 0.4rem 0 0.55rem;
+    }
+    .chip {
+      font-size: 0.6rem;
+      font-weight: 600;
+      padding: 0.2rem 0.45rem;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.45);
+      background: rgba(255, 255, 255, 0.8);
+      color: #334155;
+    }
+    .chip.on {
+      background: #1e293b;
+      color: #fff;
+      border-color: #1e293b;
+    }
+
+    /* glass 帖子/会话卡片 */
+    .glass-card {
+      background: linear-gradient(145deg, rgba(15, 23, 42, 0.65), rgba(30, 41, 59, 0.55));
+      border: 1px solid rgba(252, 211, 77, 0.15);
+      border-radius: 1rem;
+      padding: 0.55rem 0.6rem;
+      margin-bottom: 0.45rem;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    }
+    .glass-card h4 {
+      margin: 0;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--amber-50);
+    }
+    .glass-card .body-line {
+      font-size: 0.62rem;
+      color: var(--amber-100-70);
+      margin: 0.2rem 0 0;
+      line-height: 1.4;
+    }
+    .post-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: flex-start;
+    }
+    .post-row .main {
+      flex: 1;
+      min-width: 0;
+    }
+    .avatar {
+      width: 2.1rem;
+      height: 2.1rem;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(252, 211, 77, 0.2);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+      color: rgba(254, 243, 199, 0.5);
+    }
+    .name-under {
+      font-size: 0.55rem;
+      text-align: center;
+      color: rgba(254, 243, 199, 0.5);
+      margin-top: 0.15rem;
+    }
+    .luxury-chip {
+      display: inline-block;
+      font-size: 0.55rem;
+      padding: 0.12rem 0.3rem;
+      border-radius: 0.25rem;
+      background: var(--chip);
+      color: #fef3c7;
+      border: 1px solid rgba(251, 191, 36, 0.25);
+      margin-right: 0.2rem;
+    }
+
+    .conv-nested {
+      margin-top: 0.4rem;
+      border-radius: 0.6rem;
+      border: 1px solid rgba(252, 211, 77, 0.12);
+      background: rgba(0, 0, 0, 0.22);
+      padding: 0.4rem;
+    }
+    .conv-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.35rem;
+    }
+    .badge {
+      font-size: 0.5rem;
+      padding: 0.1rem 0.3rem;
+      border-radius: 999px;
+      border: 1px solid rgba(254, 243, 199, 0.25);
+      background: rgba(252, 211, 77, 0.12);
+      color: #fffbeb;
+    }
+
+    /* 发布区 */
+    .textarea-mock {
+      width: 100%;
+      min-height: 3.2rem;
+      border-radius: 0.9rem;
+      border: 1px solid rgba(252, 211, 77, 0.2);
+      background: rgba(0, 0, 0, 0.18);
+      padding: 0.45rem 0.5rem;
+      font-size: 0.62rem;
+      color: rgba(254, 243, 199, 0.6);
+    }
+    .btns {
+      display: flex;
+      gap: 0.4rem;
+      margin-top: 0.4rem;
+    }
+    .btn-pri {
+      font-size: 0.65rem;
+      font-weight: 600;
+      padding: 0.4rem 0.75rem;
+      border-radius: 0.75rem;
+      border: none;
+      background: linear-gradient(90deg, #b45309, #d97706);
+      color: #fff;
+    }
+    .btn-sec {
+      font-size: 0.65rem;
+      font-weight: 600;
+      padding: 0.4rem 0.75rem;
+      border-radius: 0.75rem;
+      border: 1px solid rgba(252, 211, 77, 0.3);
+      background: transparent;
+      color: #fde68a;
+    }
+    .meta-tiny {
+      font-size: 0.5rem;
+      color: rgba(254, 243, 199, 0.35);
+      margin-top: 0.3rem;
+    }
+    .flex-post {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.4rem;
+      align-items: flex-start;
+    }
+  </style>
+</head>
+<body>
+  <div class="doc">
+    <h1>丘比小镇 — 静态页面示意图</h1>
+    <p class="lead">
+      依据仓库内 <code>src/app/town/page.tsx</code>、<code>explore/page.tsx</code>、
+      <code>messages/page.tsx</code>、<code>my-needs/page.tsx</code> 的 DOM 结构用 HTML/CSS
+      重排而成，用于文档与汇报；<strong>不依赖</strong>本地起服务、数据库或 Playwright 截图。
+    </p>
+
+    <div class="grid">
+      <!-- /town -->
+      <div class="panel">
+        <h2>① 小镇首页</h2>
+        <div class="route">/town</div>
+        <div class="phone">
+          <div class="town-canvas">
+            <div class="town-inner">
+              <div class="app-header">
+                <span class="back">← 返回</span>
+                <span class="title">丘比小镇</span>
+                <div class="nav-mock">个人…<br />退出</div>
+              </div>
+              <div class="app-container">
+                <div class="row-between">
+                  <div>
+                    <p class="eyebrow">Chibi Town</p>
+                    <p class="h1">在小镇发布，AI 分类，10 位候选速配</p>
+                  </div>
+                  <span class="btn-light">消息中心</span>
+                </div>
+                <div class="cards-2">
+                  <div class="card-entry">
+                    <div>
+                      <p class="eyebrow">Explore</p>
+                      <h3>探索</h3>
+                      <p class="sub">查看帖子广场与 AI 分类筛选</p>
+                    </div>
+                    <div class="swatch explore" aria-hidden="true"></div>
+                  </div>
+                  <div class="card-entry">
+                    <div>
+                      <p class="eyebrow">Post</p>
+                      <h3>发布</h3>
+                      <p class="sub">发帖找人：自动标题 + 自动分类 + 10 候选</p>
+                    </div>
+                    <div class="swatch post" aria-hidden="true"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="ref">对应 <code>AppHeader</code> + 双列 <code>Link</code> 卡片；配色贴近 Tailwind 粉橙 / 天青渐变块。</p>
+      </div>
+
+      <!-- /town/explore -->
+      <div class="panel">
+        <h2>② 帖子广场（探索）</h2>
+        <div class="route">/town/explore</div>
+        <div class="phone">
+          <div class="town-canvas">
+            <div class="town-inner">
+              <div class="app-header">
+                <span class="back">←</span>
+                <span class="title">探索</span>
+                <div class="nav-mock">⋯</div>
+              </div>
+              <div class="app-container">
+                <div class="row-between">
+                  <div>
+                    <p class="h1">帖子广场</p>
+                    <p class="sub">AI 会自动分类，支持按主题筛选</p>
+                  </div>
+                  <span class="btn-light">去发布</span>
+                </div>
+                <div class="chips">
+                  <span class="chip on">全部</span>
+                  <span class="chip">分类 A</span>
+                  <span class="chip">分类 B</span>
+                </div>
+                <div class="glass-card">
+                  <div class="post-row">
+                    <div class="main">
+                      <h4>（示例）AI 生成标题行</h4>
+                      <p class="body-line">正文摘要最多三行… 与代码中 <code>line-clamp</code> 行为一致（示意）。</p>
+                      <p style="margin: 0.35rem 0 0;">
+                        <span class="luxury-chip">标签1</span><span class="luxury-chip">标签2</span>
+                      </p>
+                    </div>
+                    <div>
+                      <div class="avatar">A</div>
+                      <p class="name-under">作者</p>
+                    </div>
+                  </div>
+                </div>
+                <div class="glass-card">
+                  <div class="post-row">
+                    <div class="main">
+                      <h4>下一条帖子…</h4>
+                      <p class="body-line">列表为 <code>space-y-4</code> 的 <code>article.glass-card</code> 循环</p>
+                    </div>
+                    <div>
+                      <div class="avatar">B</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="ref">对应筛选 <code>button.rounded-full</code> + <code>glass-card</code> 资讯卡。</p>
+      </div>
+
+      <!-- /town/messages -->
+      <div class="panel">
+        <h2>③ 消息中心</h2>
+        <div class="route">/town/messages</div>
+        <div class="phone">
+          <div class="town-canvas">
+            <div class="town-inner">
+              <div class="app-header">
+                <span class="back">←</span>
+                <span class="title">消息中心</span>
+                <div class="nav-mock">⋯</div>
+              </div>
+              <div class="app-container">
+                <div class="row-between">
+                  <div>
+                    <p class="h1">消息中心</p>
+                    <p class="sub">会话按帖子分组，点开即聊天</p>
+                  </div>
+                  <span class="btn-light">返回探索</span>
+                </div>
+                <section class="glass-card" style="margin-top:0.2rem">
+                  <div class="flex-post">
+                    <div style="min-width:0">
+                      <h4>某条帖子标题（分组）</h4>
+                      <p style="margin:0.3rem 0 0">
+                        <span class="luxury-chip">类</span>
+                      </p>
+                    </div>
+                    <span style="font-size:0.5rem; color: rgba(254,243,199,0.45);">2 个会话</span>
+                  </div>
+                  <div class="conv-nested">
+                    <div class="conv-row">
+                      <div style="display:flex; gap:0.35rem; align-items:center; min-width:0">
+                        <div class="avatar" style="width:1.8rem;height:1.8rem;font-size:0.55rem">U</div>
+                        <div>
+                          <p style="margin:0; font-size:0.7rem; color:#fffbeb;">对方昵称</p>
+                          <p style="margin:0.15rem 0 0; font-size:0.6rem; color: rgba(254,243,199,0.55);">最后一条消息预览…</p>
+                        </div>
+                      </div>
+                      <span class="badge">未读 1</span>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="ref">空态为居中玻璃卡 +「去发布」主按钮；有数据时为按帖子 <code>section</code> 与嵌套 <code>button</code> 行。</p>
+      </div>
+
+      <!-- /town/my-needs -->
+      <div class="panel">
+        <h2>④ 我的需求 / 发布</h2>
+        <div class="route">/town/my-needs</div>
+        <div class="phone">
+          <div class="town-canvas">
+            <div class="town-inner">
+              <div class="app-header">
+                <span class="back">←</span>
+                <span class="title">发布</span>
+                <div class="nav-mock">⋯</div>
+              </div>
+              <div class="app-container">
+                <div class="row-between">
+                  <div>
+                    <p class="h1">发帖找人</p>
+                    <p class="sub">正文一段即可：AI 自动生成标题 + 分类</p>
+                  </div>
+                  <span class="btn-light">消息中心</span>
+                </div>
+                <div class="glass-card" style="margin-bottom:0.5rem">
+                  <p style="font-size:0.58rem; color: rgba(254,243,199,0.45); margin:0 0 0.35rem">textarea + luxury-input</p>
+                  <div class="textarea-mock">写你想找什么样的人，比如：比赛队友 / 创业伙伴 / 旅行搭子…</div>
+                  <div class="btns">
+                    <button type="button" class="btn-pri" disabled>发布</button>
+                    <button type="button" class="btn-sec">清空</button>
+                  </div>
+                </div>
+                <div class="glass-card">
+                  <div class="flex-post">
+                    <div style="min-width:0">
+                      <h4>已发布：AI 标题</h4>
+                      <p class="body-line">正文区 · <code>whitespace-pre-wrap</code></p>
+                      <p style="margin: 0.35rem 0 0;"><span class="luxury-chip">分类</span></p>
+                      <p class="meta-tiny">发布于 …</p>
+                    </div>
+                    <button type="button" class="btn-pri" style="align-self: flex-start">匹配</button>
+                  </div>
+                </div>
+                <p class="ref" style="border-top:1px dashed rgba(252,211,77,0.2); padding-top:0.4rem; margin:0.5rem 0 0">
+                  同页另有固定层 <code>z-50</code>：<strong>10 位候选人</strong>弹窗、<strong>Opener 开场</strong>弹窗（本图未展开，见 <code>my-needs/page.tsx</code> 尾段）。
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="ref">对应 <code>section.glass-card</code> 表单 + 已发帖文列表 +「匹配」打开候选与开场流程。</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

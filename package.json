@@ -6,13 +6,15 @@
     "clean": "node -e \"try{require('fs').rmSync('.next',{recursive:true,force:true})}catch(e){} try{require('fs').rmSync('node_modules/.cache',{recursive:true,force:true})}catch(e){}\"",
     "dev": "next dev",
     "dev:3456": "next dev -p 3456 -H 127.0.0.1",
-    "build": "next build",
+    "build": "node scripts/prebuild-dbpush.mjs && next build",
     "start": "next start",
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate deploy",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "capture:ui": "node scripts/capture-ui-screenshots.mjs",
+    "bundle:designer": "node scripts/bundle-designer-handoff.mjs"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -28,6 +30,7 @@
     "autoprefixer": "^10.4.0",
     "eslint": "^8.0.0",
     "eslint-config-next": "^14.2.0",
+    "playwright": "^1.49.1",
     "postcss": "^8.4.0",
     "tailwindcss": "^3.4.0",
     "typescript": "^5.0.0"

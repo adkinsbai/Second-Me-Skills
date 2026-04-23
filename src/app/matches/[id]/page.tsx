@@ -85,13 +85,12 @@ export default function MatchDetailPage() {
         </div>
 
         <div className="space-y-3">
-          <Link
-            href={`/matches/${id}/agent-chat`}
-            className="glass-card block rounded-2xl p-4 text-left transition hover:border-amber-200/45"
-          >
-            <span className="font-medium text-amber-50">双方 Agent 初识对话</span>
-            <p className="text-sm text-amber-100/60">基于双方真实资料生成，最多 100 条，可回看完整记录</p>
-          </Link>
+          <div className="glass-card rounded-2xl p-4 text-amber-100/70">
+            <span className="font-medium text-amber-50">真实匹配</span>
+            <p className="mt-1 text-sm">
+              本版以双向心动设置 + 资料向量筛选为主；双方 Agent 代聊实验入口已关闭（相关代码仍保留在仓库中）。
+            </p>
+          </div>
           {detail.latestScore ? (
             <Link
               href={`/matches/${id}/report`}
@@ -103,7 +102,7 @@ export default function MatchDetailPage() {
           ) : (
             <div className="glass-card rounded-2xl p-4 text-amber-100/55">
               <span className="font-medium text-amber-100/85">多维度评分报告</span>
-              <p className="text-sm">完成初识对话后可查看多维度报告</p>
+              <p className="text-sm">匹配生成并写入分数后即可查看报告</p>
             </div>
           )}
           {detail.status === "connected" ? (

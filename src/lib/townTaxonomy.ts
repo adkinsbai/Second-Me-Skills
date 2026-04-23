@@ -26,12 +26,16 @@ export function normalizeTownCategory(input: string): TownCategory | null {
   if (/队友|战队|比赛|电竞/.test(cleaned)) return "比赛队友";
   if (/创业|合伙|投资|项目/.test(cleaned)) return "创业伙伴";
   if (/旅游|旅行|出游|目的地/.test(cleaned)) return "旅游搭子";
-  if (/游戏|开黑|主机|steam/.test(cleaned)) return "游戏搭子";
-  if (/恋爱|对象|对象/.test(cleaned)) return "恋人";
+  if (
+    /游戏|开黑|联机|主机|steam|射击|fps|fps游戏|枪战|一起打|打游戏|排位|组队|上分|打本/.test(cleaned) ||
+    /三角洲/.test(cleaned)
+  )
+    return "游戏搭子";
+  if (/恋爱|对象|伴侣|长期伴侣|结婚|约会/.test(cleaned)) return "恋人";
   if (/灵魂|深度|精神/.test(cleaned)) return "灵魂朋友";
   if (/日常|生活|陪伴|周末/.test(cleaned)) return "日常陪伴";
   if (/深夜|夜聊|废|下班后/.test(cleaned)) return "深夜聊废";
-  return "其他";
+  return null;
 }
 
 export function classifyTownCategoriesHeuristic(content: string): TownCategory[] {
@@ -43,7 +47,11 @@ export function classifyTownCategoriesHeuristic(content: string): TownCategory[]
   if (/(队友|战队|比赛|电竞|队伍)/.test(c)) push("比赛队友");
   if (/(创业|合伙|公司|项目|投资|融资|产品)/.test(c)) push("创业伙伴");
   if (/(旅游|旅行|出游|目的地)/.test(c)) push("旅游搭子");
-  if (/(游戏|开黑|联机|主机|steam)/.test(c)) push("游戏搭子");
+  if (
+    /(游戏|开黑|联机|主机|steam|射击|fps|枪战|一起打|打游戏|排位|组队|上分|打本|打排位|开排)/.test(c) ||
+    /三角洲/.test(c)
+  )
+    push("游戏搭子");
   if (/(恋爱|对象|对象|对象|对象|长期伴侣|结婚)/.test(c)) push("恋人");
   if (/(灵魂|深度|精神共鸣|三观|价值观|信任)/.test(c)) push("灵魂朋友");
   if (/(日常|生活|周末|陪伴|聊聊|轻互动)/.test(c)) push("日常陪伴");

@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>丘比（Qiubi）— 项目总结</title>
+  <style>
+    :root {
+      --bg: #07090f;
+      --card: rgba(17, 20, 30, 0.85);
+      --line: rgba(230, 206, 151, 0.22);
+      --text: #f6f1e8;
+      --muted: #b3a58b;
+      --accent: #ebc87a;
+      --accent2: #f43f5e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, "PingFang SC", "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      background-image:
+        radial-gradient(900px 600px at 8% 8%, rgba(151, 106, 255, 0.18), transparent 60%),
+        radial-gradient(800px 520px at 100% 0%, rgba(47, 171, 255, 0.12), transparent 58%);
+      line-height: 1.55;
+      padding: 2rem 1.25rem 4rem;
+    }
+    .wrap { max-width: 920px; margin: 0 auto; }
+    header {
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin: 0 0 0.5rem;
+    }
+    .meta { color: var(--muted); font-size: 0.9rem; }
+    h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin: 2rem 0 0.75rem;
+      color: var(--accent);
+      border-left: 3px solid var(--accent2);
+      padding-left: 0.65rem;
+    }
+    h3 { font-size: 1rem; margin: 1.25rem 0 0.5rem; color: var(--text); }
+    p { margin: 0.5rem 0; color: var(--muted); }
+    ul { margin: 0.4rem 0 0.6rem; padding-left: 1.25rem; color: var(--muted); }
+    li { margin: 0.25rem 0; }
+    .lead {
+      font-size: 1.05rem;
+      color: var(--text);
+      max-width: 52ch;
+    }
+    .pill {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.2rem 0.55rem;
+      border-radius: 6px;
+      background: rgba(235, 200, 122, 0.12);
+      color: var(--accent);
+      border: 1px solid rgba(235, 200, 122, 0.25);
+      margin-right: 0.35rem;
+      margin-bottom: 0.35rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      margin: 0.75rem 0;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 0.55rem 0.65rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: rgba(255, 255, 255, 0.04); color: var(--accent); font-weight: 600; }
+    code {
+      font-family: ui-monospace, "Cascadia Code", monospace;
+      font-size: 0.82em;
+      background: rgba(0, 0, 0, 0.35);
+      padding: 0.12em 0.35em;
+      border-radius: 4px;
+      color: #f0dcc8;
+    }
+    .grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      margin-top: 0.75rem;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 1rem 1.1rem;
+    }
+    .card h4 {
+      margin: 0 0 0.35rem;
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+    .route { font-size: 0.8rem; color: var(--accent); word-break: break-all; margin-bottom: 0.4rem; }
+    .card p { font-size: 0.88rem; margin: 0; }
+    footer {
+      margin-top: 3rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--line);
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    @media print {
+      body { background: #fff; color: #111; }
+      .card, th, td { border-color: #ccc; }
+      :root { --text: #111; --muted: #444; --accent: #333; }
+    }
+    .visual-banner {
+      background: rgba(235, 200, 122, 0.08);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 1rem 1.15rem;
+      margin-bottom: 2rem;
+      font-size: 0.92rem;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+    .visual-banner a { color: var(--accent); font-weight: 600; }
+    .shots {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1.25rem;
+      margin-top: 1rem;
+    }
+    figure.shot {
+      margin: 0;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    figure.shot figcaption {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--accent);
+      border-bottom: 1px solid var(--line);
+    }
+    figure.shot .shot-body {
+      min-height: 200px;
+      background: rgba(0,0,0,0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    figure.shot img {
+      width: 100%;
+      height: auto;
+      vertical-align: middle;
+      display: block;
+    }
+    .shot-placeholder {
+      padding: 1.5rem;
+      text-align: center;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>丘比（Qiubi）— 项目总结</h1>
+      <p class="meta">Next.js 全栈交友匹配应用 · 文档与代码对齐 · 供汇报与归档使用</p>
+    </header>
+
+    <div class="visual-banner">
+      <strong style="color: var(--text);">看真实界面有多种方式：</strong><br />
+      ① <strong>实时预览（推荐）</strong>：先 <code>npm run dev:3456</code>，浏览器打开
+      <a href="http://127.0.0.1:3456/project-summary-visual.html">http://127.0.0.1:3456/project-summary-visual.html</a>
+      — 同源嵌入各路由，可看到当前代码渲染效果；带 <code>[id]</code> 的页面可在该页底部输入路径预览。<br />
+      ② <strong>静态截图（本页下方）</strong>：在另一终端已启动 <code>dev:3456</code> 的前提下执行 <code>npm run capture:ui</code>，PNG 会写入 <code>public/ui-screenshots/</code>，刷新本 HTML 即可看到嵌入图（未生成前显示占位说明）。<br />
+      ③ <strong>纯 HTML 示意图（无需起服务 / 数据库）</strong>：见 <a href="public/town-schematics.html"><code>public/town-schematics.html</code></a>；<code>npm run dev:3456</code> 后同页可打开
+      <a href="http://127.0.0.1:3456/town-schematics.html">http://127.0.0.1:3456/town-schematics.html</a>，并<strong>内嵌在</strong>
+      <a href="http://127.0.0.1:3456/project-summary-visual.html"><code>project-summary-visual.html</code></a> 中部「小镇四页结构示意」区块。该示意按 <code>src/app/town</code> 下四个 <code>page.tsx</code> 重排，非 Playwright 截图。<br />
+      ④ <strong>给 UI/视觉设计师外发</strong>：单页
+      <a href="http://127.0.0.1:3456/designer-handoff.html"><code>public/designer-handoff.html</code></a> + <code>ui-screenshots/</code> 打 zip；<strong>单文件外发</strong>时执行 <code>npm run bundle:designer</code> 生成 <a href="http://127.0.0.1:3456/designer-handoff-embedded.html"><code>designer-handoff-embedded.html</code></a>（图与线框全部 data: 内嵌，无需同目录资源）。
+    </div>
+
+    <section>
+      <h2>界面截图（本地生成后显示）</h2>
+      <p>以下图片由 <code>npm run capture:ui</code> 自动生成，与线上一致；若文件不存在会显示灰色占位。</p>
+      <div class="shots" id="shots"></div>
+    </section>
+
+    <section>
+      <h2>应用是做什么的</h2>
+      <p class="lead">
+        <strong>丘比</strong>是一款面向「真实心动匹配」的交友应用：用户设置心动偏好与阈值，系统在候选池中做<strong>双向条件筛选</strong>，再结合<strong>资料向量与合拍模型</strong>打分，生成匹配结果；解锁后可进行<strong>真人聊天</strong>，并查看<strong>多维度评分报告</strong>。产品同时集成 <strong>SecondMe</strong> 数字体能力（OAuth、流式聊天、用户画像等），并包含<strong>丘比小镇</strong>社区发帖与双人对话等模块。
+      </p>
+      <p>
+        <span class="pill">黑客松 / 演示向</span>
+        <span class="pill">匹配引擎 + 可视化流水线</span>
+        <span class="pill">PostgreSQL + Prisma</span>
+      </p>
+    </section>
+
+    <section>
+      <h2>已实现的核心功能（概览）</h2>
+      <ul>
+        <li><strong>账号与登录</strong>：SecondMe OAuth2、本地邮箱密码（bcrypt）、访客、忘记/重置密码。</li>
+        <li><strong>资料与心动设置</strong>：昵称/头像/简介/性别/年龄、期望对象、地区、匹配类型、聊天节奏、心动阈值等（<code>UserPreference</code>）。</li>
+        <li><strong>匹配流水线</strong>：多阶段筛选（池扫描 → 有效账号 → 双向心动条件 → 向量/合拍 → 双向阈值），<code>/api/matches/seed</code> 返回阶段统计；首页/匹配开始页可展示进度与动画。</li>
+        <li><strong>匹配列表与详情</strong>：历史匹配、综合分、入口至聊天/报告/关系页；解锁后与对方对称的匹配记录。</li>
+        <li><strong>真人聊天</strong>：REST 收发消息、<strong>SSE</strong> 推送新消息、乐观发送、已读（<code>MatchRead</code>）、分页加载更早消息、图片 DataURL、微信风格气泡 UI。</li>
+        <li><strong>评分报告 / 关系洞察</strong>：多维度分数与说明文案（与 <code>MatchScore</code>、demo 报告数据结合）。</li>
+        <li><strong>丘比小镇</strong>：发帖、探索、我的需求、会话列表、小镇内双人聊天与已读。</li>
+        <li><strong>数字体相关（SecondMe）</strong>：首页/Owner 侧流式聊天、Act 流式接口等；<strong>双方 Agent 初识对话</strong>相关代码保留，产品入口可按版本关闭或隐藏。</li>
+        <li><strong>其他页面</strong>：隐私政策、自我介绍测验、Onboarding 变体等。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>技术栈</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>层级</th>
+            <th>技术选型</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>框架</td>
+            <td>Next.js 14（App Router，SSR + Route Handlers）</td>
+          </tr>
+          <tr>
+            <td>语言 / UI</td>
+            <td>TypeScript 5 · React 18 · Tailwind CSS 3 · 全局 CSS 动画</td>
+          </tr>
+          <tr>
+            <td>数据</td>
+            <td>PostgreSQL（如 Neon）· Prisma 5 ORM · <code>schema.prisma</code> 管理模型</td>
+          </tr>
+          <tr>
+            <td>实时</td>
+            <td>聊天：SSE（<code>/api/matches/[id]/chat/stream</code>）轮询合并新消息；客户端乐观更新</td>
+          </tr>
+          <tr>
+            <td>外部服务</td>
+            <td>SecondMe API（OAuth、<code>/api/secondme/chat/stream</code>、用户 shades 等）</td>
+          </tr>
+          <tr>
+            <td>匹配算法</td>
+            <td>自研 <code>matchPipeline</code> + <code>userModeling</code> / <code>scoreCompatibility</code>；资料向量存 <code>UserEmbedding</code>（可演进为 pgvector + 真实 Embedding）</td>
+          </tr>
+          <tr>
+            <td>部署</td>
+            <td>典型为 Vercel Serverless（需配置 <code>DATABASE_URL</code> 与 SecondMe 环境变量）</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>页面路由一览</h2>
+      <p>以下为应用中主要 <code>page.tsx</code> 对应路由及作用摘要（以仓库当前结构为准）。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>路由</th>
+            <th>功能概览</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>/</code></td>
+            <td>首页：登录态下展示匹配网络/入口、与 SecondMe 相关主流程入口等。</td>
+          </tr>
+          <tr>
+            <td><code>/auth</code></td>
+            <td>登录与注册：SecondMe OAuth、本地账号表单等。</td>
+          </tr>
+          <tr>
+            <td><code>/auth/forgot-password</code></td>
+            <td>忘记密码：提交邮箱申请重置链接。</td>
+          </tr>
+          <tr>
+            <td><code>/auth/reset-password</code></td>
+            <td>重置密码：带 token 的表单页。</td>
+          </tr>
+          <tr>
+            <td><code>/onboarding</code></td>
+            <td>新用户引导：分步填写基础信息与偏好。</td>
+          </tr>
+          <tr>
+            <td><code>/onboarding/paradise</code></td>
+            <td>引导子流程（活动/乐园向页面）。</td>
+          </tr>
+          <tr>
+            <td><code>/intro/quiz</code></td>
+            <td>自我介绍测验：问卷式补充画像。</td>
+          </tr>
+          <tr>
+            <td><code>/settings/heartbeat</code></td>
+            <td>心动设置：阈值、期望性别/年龄/地区、匹配类型、节奏等。</td>
+          </tr>
+          <tr>
+            <td><code>/match-start</code></td>
+            <td>开启匹配：调用 seed API，展示匹配流水线阶段与动画。</td>
+          </tr>
+          <tr>
+            <td><code>/matches</code></td>
+            <td>匹配列表：历史对象、分数与未读等。</td>
+          </tr>
+          <tr>
+            <td><code>/matches/[id]</code></td>
+            <td>匹配详情：对方资料摘要、多维评分、进入聊天/报告/关系等入口。</td>
+          </tr>
+          <tr>
+            <td><code>/matches/[id]/chat</code></td>
+            <td>真人聊天：SSE + 消息列表、输入区、已读、图片等。</td>
+          </tr>
+          <tr>
+            <td><code>/matches/[id]/report</code></td>
+            <td>评分报告：综合分与维度说明。</td>
+          </tr>
+          <tr>
+            <td><code>/matches/[id]/relationship</code></td>
+            <td>关系洞察：基于匹配的延伸分析展示。</td>
+          </tr>
+          <tr>
+            <td><code>/matches/[id]/agent-chat</code></td>
+            <td>双方 Agent 初识对话（代码保留；产品策略上可隐藏入口）。</td>
+          </tr>
+          <tr>
+            <td><code>/users/[id]</code></td>
+            <td>用户公开主页：查看他人资料与标签。</td>
+          </tr>
+          <tr>
+            <td><code>/town</code></td>
+            <td>丘比小镇首页：我的帖子/对话入口与帖子流。</td>
+          </tr>
+          <tr>
+            <td><code>/town/explore</code></td>
+            <td>探索：按分类浏览需求帖子。</td>
+          </tr>
+          <tr>
+            <td><code>/town/messages</code></td>
+            <td>小镇消息列表：会话入口。</td>
+          </tr>
+          <tr>
+            <td><code>/town/my-needs</code></td>
+            <td>我发布的需求管理。</td>
+          </tr>
+          <tr>
+            <td><code>/town/conversations/[id]</code></td>
+            <td>小镇双人对话：帖子上文上下文 + 聊天。</td>
+          </tr>
+          <tr>
+            <td><code>/privacy</code></td>
+            <td>隐私政策静态说明页。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>各页面说明（卡片）</h2>
+      <div class="grid">
+        <div class="card">
+          <h4>首页</h4>
+          <div class="route">/</div>
+          <p>应用主入口：展示品牌氛围与核心操作（如匹配、SecondMe 相关能力）；未登录引导至认证。</p>
+        </div>
+        <div class="card">
+          <h4>认证</h4>
+          <div class="route">/auth · /auth/forgot-password · /auth/reset-password</div>
+          <p>统一处理第三方 OAuth 与本地账号；支持密码找回与重置流程。</p>
+        </div>
+        <div class="card">
+          <h4>引导与测验</h4>
+          <div class="route">/onboarding · /onboarding/paradise · /intro/quiz</div>
+          <p>降低冷启动成本：分步收集信息；测验补充画像用于匹配与展示。</p>
+        </div>
+        <div class="card">
+          <h4>心动设置</h4>
+          <div class="route">/settings/heartbeat</div>
+          <p>配置「谁会进你的池子」：阈值、地区、年龄、类型、节奏等，驱动 seed 与流水线。</p>
+        </div>
+        <div class="card">
+          <h4>开启匹配</h4>
+          <div class="route">/match-start</div>
+          <p>触发 <code>POST /api/matches/seed</code>，展示各阶段人数与视觉反馈，成功则跳转匹配详情。</p>
+        </div>
+        <div class="card">
+          <h4>匹配列表 / 详情</h4>
+          <div class="route">/matches · /matches/[id]</div>
+          <p>浏览历史匹配；详情页展示分数、操作入口（聊天、报告、洞察）。</p>
+        </div>
+        <div class="card">
+          <h4>真人聊天</h4>
+          <div class="route">/matches/[id]/chat</div>
+          <p>双人对聊：HTTP 发送、SSE 收消息、已读同步、历史分页、图片与输入体验优化。</p>
+        </div>
+        <div class="card">
+          <h4>报告与关系</h4>
+          <div class="route">/matches/[id]/report · /matches/[id]/relationship</div>
+          <p>结构化呈现匹配解释与关系向洞察，辅助用户决策是否深聊。</p>
+        </div>
+        <div class="card">
+          <h4>Agent 双聊（可选）</h4>
+          <div class="route">/matches/[id]/agent-chat</div>
+          <p>基于 SecondMe 流式接口的双方 Agent 对话；业务上可与「真实匹配」策略解耦。</p>
+        </div>
+        <div class="card">
+          <h4>用户主页</h4>
+          <div class="route">/users/[id]</div>
+          <p>查看他人公开资料与标签，可跳转发起小镇或匹配相关动作（视业务逻辑）。</p>
+        </div>
+        <div class="card">
+          <h4>丘比小镇</h4>
+          <div class="route">/town · /town/explore · /town/messages · /town/my-needs</div>
+          <p>社区发帖、分类探索、会话列表与个人需求管理，与「心动匹配」数据模型分离。</p>
+        </div>
+        <div class="card">
+          <h4>小镇对话</h4>
+          <div class="route">/town/conversations/[id]</div>
+          <p>围绕帖子上下文的 1v1 聊天，独立消息表与已读模型。</p>
+        </div>
+        <div class="card">
+          <h4>隐私</h4>
+          <div class="route">/privacy</div>
+          <p>合规与信任：数据使用与隐私说明。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>延伸阅读</h2>
+      <p>仓库内另有 <code>FEATURES.md</code>（功能与技术细节）、<code>UI-SPEC.md</code> / <code>UI-SPEC-FIGMA.md</code>（界面规格），可与本页一并用于评审与交付。</p>
+    </section>
+
+    <footer>
+      本文档为静态总结页，与代码库功能对齐；若路由或功能有变更，请以 <code>src/app</code> 与 <code>FEATURES.md</code> 为准并更新本 HTML。
+    </footer>
+  </div>
+  <script>
+    (function () {
+      var shots = [
+        { file: "home.png", label: "首页 /" },
+        { file: "auth.png", label: "登录 /auth" },
+        { file: "privacy.png", label: "隐私 /privacy" },
+        { file: "intro-quiz.png", label: "测验 /intro/quiz" },
+        { file: "onboarding.png", label: "引导 /onboarding" },
+        { file: "match-start.png", label: "开启匹配 /match-start" },
+        { file: "heartbeat.png", label: "心动设置 /settings/heartbeat" },
+        { file: "matches.png", label: "匹配列表 /matches" },
+        { file: "town.png", label: "小镇 /town" },
+        { file: "town-explore.png", label: "小镇探索 /town/explore" },
+        { file: "town-messages.png", label: "小镇消息 /town/messages" },
+        { file: "town-my-needs.png", label: "我的需求 /town/my-needs" },
+      ];
+      var root = document.getElementById("shots");
+      if (!root) return;
+      for (var i = 0; i < shots.length; i++) {
+        var s = shots[i];
+        var fig = document.createElement("figure");
+        fig.className = "shot";
+        var cap = document.createElement("figcaption");
+        cap.textContent = s.label;
+        var body = document.createElement("div");
+        body.className = "shot-body";
+        var img = document.createElement("img");
+        img.alt = s.label;
+        img.src = "public/ui-screenshots/" + s.file;
+        (function (imgEl, bodyEl) {
+          imgEl.onerror = function () {
+            imgEl.style.display = "none";
+            if (bodyEl.querySelector(".shot-placeholder")) return;
+            var ph = document.createElement("div");
+            ph.className = "shot-placeholder";
+            ph.innerHTML =
+              "尚未生成截图<br/><small>在项目目录执行 <code>npm run capture:ui</code><br/>（需先另开终端 <code>npm run dev:3456</code>）</small>";
+            bodyEl.appendChild(ph);
+          };
+        })(img, body);
+        body.appendChild(img);
+        fig.appendChild(cap);
+        fig.appendChild(body);
+        root.appendChild(fig);
+      }
+      var note = document.createElement("p");
+      note.style.marginTop = "1.25rem";
+      note.style.fontSize = "0.88rem";
+      note.style.color = "var(--muted)";
+      note.innerHTML =
+        "带动态 id 的页面（例如 <code>/matches/[id]/chat</code>、<code>/matches/[id]/report</code>、<code>/users/[id]</code>、<code>/town/conversations/[id]</code>）无法固定 URL 自动截图；请打开实时预览页，在「自定义路径」中粘贴浏览器地址栏里的完整链接。";
+      root.parentNode.insertBefore(note, root.nextSibling);
+    })();
+  </script>
+</body>
+</html>

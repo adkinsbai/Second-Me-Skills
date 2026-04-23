@@ -21,12 +21,19 @@ model User {
   name              String?
   avatarUrl         String?  @map("avatar_url")
   bio               String?
+  // 双向心动筛选：male | female | nonbinary 等；未填则不做性别向匹配
+  gender            String?  @map("gender")
+  // 双向年龄期望；未填则仅依据偏好区间重叠规则
+  age               Int?     @map("age")
+
   photo1           String?  @map("photo_1")
   photo2           String?  @map("photo_2")
   photo3           String?  @map("photo_3")
   onboardingDone   Boolean  @default(true) @map("onboarding_done")
   privacyAcceptedAt DateTime? @map("privacy_accepted_at")
   agentLearnConsent Boolean @default(false) @map("agent_learn_consent")
+  resetPasswordTokenHash String? @map("reset_password_token_hash")
+  resetPasswordExpiresAt DateTime? @map("reset_password_expires_at")
 
   sessions         Session[]
   ownerFacts       OwnerFact[]
@@ -44,7 +51,22 @@ model User {
   townConversationReads TownConversationRead[] @relation("TownConversationReadsUser")
   townConversationMessages TownConversationMessage[] @relation("TownConversationMessageSender")
 
+  profileEmbedding UserEmbedding?
+
   @@map("users")
+}
+
+// 资料向量（简介/标签等生成的哈希向量；可后续换真实 embedding + pgvector）
+model UserEmbedding {
+  userId    String   @id @map("user_id")
+  source    String   @default("profile_hash") @map("source")
+  dims      Int      @default(1024) @map("dims")
+  values    Json     @map("values")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_embeddings")
 }
 
 model OwnerFact {

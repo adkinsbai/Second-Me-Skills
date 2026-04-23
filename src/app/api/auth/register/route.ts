@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { setSessionCookie } from "@/lib/auth";
+import { setSessionCookieWithOptions } from "@/lib/auth";
 import { hashPassword } from "@/lib/password";
 import { hitRateLimit } from "@/lib/rateLimit";
 
@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
   const email = String(body?.email ?? "").trim().toLowerCase();
   const password = String(body?.password ?? "");
   const name = String(body?.name ?? "").trim() || "新用户";
+  const rememberMe = body?.rememberMe !== false;
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   const rl = hitRateLimit(`register:${ip}`, 10, 10 * 60 * 1000);
   if (rl.limited) {
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  setSessionCookie(user.id);
+  setSessionCookieWithOptions(user.id, { remember: rememberMe });
   return NextResponse.json({
     code: 0,
     data: { id: user.id, email: user.email, name: user.name, authProvider: user.authProvider },

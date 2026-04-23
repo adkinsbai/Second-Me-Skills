@@ -1,418 +1,556 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useTransition,
+} from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { MatchFeedbackModal } from "@/components/MatchFeedbackModal";
+import {
+  ChatBubble,
+  ChatTimeDivider,
+  type BubbleMsg,
+} from "@/components/ChatBubble";
 
-type Msg = {
-  id: string;
-  senderType: string;
-  content: string;
-  createdAt: string;
-  readByOther?: boolean;
-};
+// ─── Time label helpers ────────────────────────────────────────────────
+function fmtTime(iso: string) {
+  const d = new Date(iso);
+  const now = new Date();
+  const diffDays = Math.floor(
+    (now.setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / 86400000
+  );
+  const hhmm = d.toLocaleTimeString("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  if (diffDays === 0) return hhmm;
+  if (diffDays === 1) return `昨天 ${hhmm}`;
+  if (diffDays < 7) {
+    const weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+    return `${weekdays[d.getDay()]} ${hhmm}`;
+  }
+  return `${d.getMonth() + 1}/${d.getDate()} ${hhmm}`;
+}
+
+function needsDivider(prev: BubbleMsg | undefined, cur: BubbleMsg): boolean {
+  if (!prev) return true;
+  return (
+    new Date(cur.createdAt).getTime() -
+      new Date(prev.createdAt).getTime() >
+    5 * 60 * 1000
+  );
+}
+
+// ─── Emoji panel data ──────────────────────────────────────────────────
+const EMOJI_ROWS = [
+  ["😊", "😂", "🥰", "😍", "🤩", "😎", "🥺", "😭", "😡", "🤔"],
+  ["❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "💔", "💕"],
+  ["👍", "👎", "👏", "🙌", "🤝", "✌️", "🤞", "👋", "🙏", "💪"],
+  ["🌹", "🌸", "🌺", "✨", "🎉", "🎊", "🔥", "⭐", "🌙", "☀️"],
+  ["🍕", "🍜", "🍣", "🍦", "🎧", "🎮", "📚", "✈️", "🏖️", "⛰️"],
+];
+
+// ─── Load more page size ───────────────────────────────────────────────
+const PAGE_SIZE = 40;
 
 export default function HumanChatPage() {
   const params = useParams();
   const id = params.id as string;
-  const [messages, setMessages] = useState<Msg[]>([]);
-  const [targetName, setTargetName] = useState<string>("对方");
+
+  const [messages, setMessages] = useState<BubbleMsg[]>([]);
+  const [targetName, setTargetName] = useState("对方");
   const [targetUserId, setTargetUserId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [simulating, setSimulating] = useState(false);
+  const [showEmoji, setShowEmoji] = useState(false);
+  const [selectedImageDataUrl, setSelectedImageDataUrl] = useState<
+    string | null
+  >(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [typingVisible, setTypingVisible] = useState(false);
+  const [, startTransition] = useTransition();
+
   const bottomRef = useRef<HTMLDivElement>(null);
-  const [selectedImageDataUrl, setSelectedImageDataUrl] = useState<string | null>(null);
-  const inFlightRef = useRef(false);
-  const [bgMode, setBgMode] = useState<"preset0" | "preset1" | "preset2" | "preset3" | "preset4" | "upload">("preset0");
-  const [bgUploadDataUrl, setBgUploadDataUrl] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const sseShouldReconnect = useRef(true);
+  const sseRef = useRef<EventSource | null>(null);
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingIdRef = useRef(0);
 
-  const emojiOptions = ["😊", "😂", "❤️", "✨", "🥺", "🤔", "👍", "👋", "🌙", "🎧"];
-  const lastMarkedRef = useRef<number>(0);
-  const lastMsgCountRef = useRef<number>(0);
+  // ─── Scroll to bottom ─────────────────────────────────────────────
+  const scrollToBottom = useCallback((smooth = true) => {
+    bottomRef.current?.scrollIntoView({
+      behavior: smooth ? "smooth" : "instant",
+    });
+  }, []);
 
-  const markRead = useCallback(() => {
-    if (!id) return;
-    fetch(`/api/matches/${id}/chat/read`, {
-      method: "POST",
-      credentials: "include",
-    }).catch(() => {});
-  }, [id]);
-
-  useEffect(() => {
-    if (!id) return;
-    const key = `qiubi_chat_bg_${id}`;
-    try {
-      const raw = localStorage.getItem(key);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as { bgMode?: string; bgUploadDataUrl?: string | null };
-      if (parsed.bgMode) setBgMode(parsed.bgMode as any);
-      if (parsed.bgUploadDataUrl) setBgUploadDataUrl(parsed.bgUploadDataUrl);
-    } catch {
-      // ignore
-    }
-  }, [id]);
-
-  useEffect(() => {
-    if (!id) return;
-    const key = `qiubi_chat_bg_${id}`;
-    try {
-      localStorage.setItem(
-        key,
-        JSON.stringify({ bgMode, bgUploadDataUrl })
-      );
-    } catch {
-      // ignore
-    }
-  }, [bgMode, bgUploadDataUrl, id]);
-
-  const load = useCallback(async () => {
-    if (!id) return;
-    if (inFlightRef.current) return;
-    inFlightRef.current = true;
-    try {
-      const [detailRes, chatRes] = await Promise.all([
-        fetch(`/api/matches/${id}`, { credentials: "include" }).then((r) => r.json()),
-        fetch(`/api/matches/${id}/chat?limit=60`, { credentials: "include" }).then((r) => r.json()),
-      ]);
-      if (detailRes?.code === 0 && detailRes?.data?.targetUser) {
-        setTargetName(detailRes.data.targetUser.name);
-        setTargetUserId(detailRes.data.targetUser.id ?? null);
+  // ─── Merge messages (de-dup by id) ────────────────────────────────
+  const mergeMessages = useCallback((incoming: BubbleMsg[]) => {
+    setMessages((prev) => {
+      const map = new Map(prev.map((m) => [m.id, m]));
+      for (const m of incoming) {
+        map.set(m.id, m);
       }
-      if (chatRes?.code === 0 && Array.isArray(chatRes?.data)) setMessages(chatRes.data);
-    } catch {
-      // ignore
-    } finally {
-      inFlightRef.current = false;
-    }
-  }, [id]);
+      return Array.from(map.values()).sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      );
+    });
+  }, []);
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  useEffect(() => {
+  // ─── Initial load ─────────────────────────────────────────────────
+  const initialLoad = useCallback(async () => {
     if (!id) return;
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible") load();
-    }, 2300);
-    const onFocus = () => load();
-    if (typeof window !== "undefined") window.addEventListener("focus", onFocus);
-    return () => {
-      window.clearInterval(timer);
-      if (typeof window !== "undefined") window.removeEventListener("focus", onFocus);
+    const [detailRes, chatRes] = await Promise.all([
+      fetch(`/api/matches/${id}`, { credentials: "include" }).then((r) =>
+        r.json()
+      ),
+      fetch(`/api/matches/${id}/chat?limit=${PAGE_SIZE}`, {
+        credentials: "include",
+      }).then((r) => r.json()),
+    ]).catch(() => [null, null]);
+
+    if (detailRes?.code === 0 && detailRes?.data?.targetUser) {
+      setTargetName(detailRes.data.targetUser.name ?? "对方");
+      setTargetUserId(detailRes.data.targetUser.id ?? null);
+    }
+    if (chatRes?.code === 0 && Array.isArray(chatRes.data)) {
+      const msgs: BubbleMsg[] = chatRes.data;
+      setMessages(msgs);
+      setHasMore(msgs.length >= PAGE_SIZE);
+      setTimeout(() => scrollToBottom(false), 60);
+    }
+  }, [id, scrollToBottom]);
+
+  useEffect(() => {
+    initialLoad();
+  }, [initialLoad]);
+
+  // ─── SSE connection ───────────────────────────────────────────────
+  const connectSSE = useCallback(() => {
+    if (!id || !sseShouldReconnect.current) return;
+
+    const lastMsg = messages[messages.length - 1];
+    const after = lastMsg
+      ? new Date(lastMsg.createdAt).toISOString()
+      : new Date(Date.now() - 60_000).toISOString();
+
+    const es = new EventSource(
+      `/api/matches/${id}/chat/stream?after=${encodeURIComponent(after)}`
+    );
+    sseRef.current = es;
+
+    es.addEventListener("messages", (e) => {
+      const incoming: BubbleMsg[] = JSON.parse(e.data);
+      if (!incoming.length) return;
+      startTransition(() => {
+        mergeMessages(incoming);
+      });
+      setTimeout(() => scrollToBottom(), 80);
+
+      // Show typing indicator briefly for incoming from other
+      const hasIncoming = incoming.some((m) => m.senderType === "user_target");
+      if (hasIncoming) {
+        setTypingVisible(false);
+      }
+
+      // Auto mark read
+      fetch(`/api/matches/${id}/chat/read`, {
+        method: "POST",
+        credentials: "include",
+      }).catch(() => {});
+    });
+
+    es.addEventListener("read_update", () => {
+      // Refresh to pick up read status changes
+      fetch(`/api/matches/${id}/chat?limit=${PAGE_SIZE}`, {
+        credentials: "include",
+      })
+        .then((r) => r.json())
+        .then((chatRes) => {
+          if (chatRes?.code === 0 && Array.isArray(chatRes.data)) {
+            startTransition(() => mergeMessages(chatRes.data));
+          }
+        })
+        .catch(() => {});
+    });
+
+    es.addEventListener("reconnect", () => {
+      es.close();
+      if (sseShouldReconnect.current) {
+        setTimeout(connectSSE, 1000);
+      }
+    });
+
+    es.onerror = () => {
+      es.close();
+      if (sseShouldReconnect.current) {
+        setTimeout(connectSSE, 2000);
+      }
     };
-  }, [id, load]);
+  }, [id, mergeMessages, scrollToBottom]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    sseShouldReconnect.current = true;
+    connectSSE();
+    return () => {
+      sseShouldReconnect.current = false;
+      sseRef.current?.close();
+    };
+  }, [connectSSE]);
 
-  useEffect(() => {
-    if (!id) return;
-    if (messages.length === 0) return;
-    const c = messages.length;
-    const now = Date.now();
-    if (c !== lastMsgCountRef.current) {
-      lastMsgCountRef.current = c;
-      // 新消息后稍微等一下，减少无意义请求
-      window.setTimeout(() => {
-        if (Date.now() - lastMarkedRef.current > 1200) {
-          lastMarkedRef.current = Date.now();
-          markRead();
-        }
-      }, 900);
+  // ─── Load older messages ──────────────────────────────────────────
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore || !id) return;
+    setLoadingMore(true);
+    const oldest = messages[0];
+    if (!oldest) {
+      setLoadingMore(false);
+      return;
     }
-  }, [messages.length, id, markRead]);
+    try {
+      const r = await fetch(
+        `/api/matches/${id}/chat?limit=${PAGE_SIZE}&before=${encodeURIComponent(
+          oldest.createdAt
+        )}`,
+        { credentials: "include" }
+      );
+      const res = await r.json();
+      if (res?.code === 0 && Array.isArray(res.data) && res.data.length > 0) {
+        const scrollEl = scrollRef.current;
+        const prevScrollHeight = scrollEl?.scrollHeight ?? 0;
+        setMessages((prev) => {
+          const map = new Map(prev.map((m) => [m.id, m]));
+          for (const m of res.data as BubbleMsg[]) map.set(m.id, m);
+          return Array.from(map.values()).sort(
+            (a, b) =>
+              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          );
+        });
+        setHasMore((res.data as BubbleMsg[]).length >= PAGE_SIZE);
+        // Keep scroll position after prepend
+        requestAnimationFrame(() => {
+          if (scrollEl) {
+            scrollEl.scrollTop =
+              scrollEl.scrollHeight - prevScrollHeight;
+          }
+        });
+      } else {
+        setHasMore(false);
+      }
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [id, loadingMore, hasMore, messages]);
 
-  const sendText = async (text: string) => {
-    const t = text.trim();
-    if (!t) return;
-    await fetch(`/api/matches/${id}/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: t }),
-    }).catch(() => null);
-  };
-
-  const sendImage = async (dataUrl: string) => {
-    if (!dataUrl) return;
-    await fetch(`/api/matches/${id}/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: `IMAGE_DATA:${dataUrl}` }),
-    }).catch(() => null);
-  };
-
-  const send = async () => {
+  // ─── Send message ─────────────────────────────────────────────────
+  const send = useCallback(async () => {
     if (sending || !id) return;
     const text = input.trim();
     const image = selectedImageDataUrl;
     if (!text && !image) return;
+
     setSending(true);
     setInput("");
     setSelectedImageDataUrl(null);
+    setShowEmoji(false);
+    if (textareaRef.current) textareaRef.current.style.height = "40px";
+
+    const toSend: Array<{ content: string; pendingId: string }> = [];
+    if (text) {
+      const pid = `pending_${++pendingIdRef.current}`;
+      toSend.push({ content: text, pendingId: pid });
+    }
+    if (image) {
+      const pid = `pending_${++pendingIdRef.current}`;
+      toSend.push({
+        content: `IMAGE_DATA:${image}`,
+        pendingId: pid,
+      });
+    }
+
+    // Optimistic insert
+    const now = new Date().toISOString();
+    const optimistic: BubbleMsg[] = toSend.map(({ content, pendingId }) => ({
+      id: pendingId,
+      senderType: "user_self",
+      content,
+      createdAt: now,
+      readByOther: false,
+      pending: true,
+    }));
+    setMessages((prev) => [...prev, ...optimistic]);
+    setTimeout(() => scrollToBottom(), 60);
+
     try {
-      if (text) await sendText(text);
-      if (image) await sendImage(image);
+      for (const { content, pendingId } of toSend) {
+        const r = await fetch(`/api/matches/${id}/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ content }),
+        });
+        const res = await r.json().catch(() => null);
+        if (res?.code === 0 && res?.data?.id) {
+          // Replace optimistic with real
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === pendingId
+                ? { ...res.data, senderType: "user_self" as const, pending: false }
+                : m
+            )
+          );
+        } else {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === pendingId ? { ...m, pending: false, failed: true } : m
+            )
+          );
+        }
+      }
     } finally {
       setSending(false);
-      load();
+    }
+  }, [id, input, selectedImageDataUrl, sending, scrollToBottom]);
+
+  // ─── Textarea auto-resize ─────────────────────────────────────────
+  const onInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+    const el = e.target;
+    el.style.height = "40px";
+    el.style.height = Math.min(el.scrollHeight, 120) + "px";
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send();
     }
   };
 
-  const simulateReply = async () => {
-    if (simulating || !id) return;
-    setSimulating(true);
-    try {
-      await fetch(`/api/matches/${id}/chat/reply`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: "你好呀，很高兴和你聊天～" }),
-      }).catch(() => null);
-    } finally {
-      setSimulating(false);
-      load();
-    }
-  };
+  // ─── Typing indicator simulation ─────────────────────────────────
+  // Show "对方正在输入" when SSE is quiet but user recently received messages
+  useEffect(() => {
+    return () => {
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    };
+  }, []);
 
+  // ─── Image pick ───────────────────────────────────────────────────
   const onPickImage = async (file: File | null) => {
-    if (!file) return;
-    if (!file.type.startsWith("image/")) return;
-    const MAX_BYTES = 160 * 1024; // 限制体积，避免 DataURL 过长导致写入失败
-    if (file.size > MAX_BYTES) {
-      alert("图片有点大啦，请换一张小一点的（<= 320KB）");
+    if (!file || !file.type.startsWith("image/")) return;
+    if (file.size > 300 * 1024) {
+      alert("图片请控制在 300KB 以内哦～");
       return;
     }
     const dataUrl: string = await new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result));
-      reader.onerror = () => reject(new Error("read image failed"));
+      reader.onerror = () => reject(new Error("read failed"));
       reader.readAsDataURL(file);
     });
     setSelectedImageDataUrl(dataUrl);
   };
 
-  const renderContent = (content: string) => {
-    if (content.startsWith("IMAGE_DATA:")) {
-      const dataUrl = content.slice("IMAGE_DATA:".length);
-      return (
-        <img
-          alt="图片"
-          src={dataUrl}
-          loading="lazy"
-          decoding="async"
-          className="max-h-[220px] w-auto rounded-lg object-contain"
-        />
-      );
-    }
-    return <span>{content}</span>;
-  };
-
+  // ─── Render ───────────────────────────────────────────────────────
   return (
-    <main
-      className="page-shell flex min-h-screen flex-col"
-      style={
-        bgMode === "upload" && bgUploadDataUrl
-          ? {
-              backgroundImage: `url(${bgUploadDataUrl})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              backgroundRepeat: "no-repeat",
-            }
-          : undefined
-      }
-    >
-      <AppHeader
-        backHref={`/matches/${id}`}
-        title={targetName}
-        right={
-          <div className="flex items-center gap-2">
-            {targetUserId ? (
-              <Link
-                href={`/users/${targetUserId}`}
-                className="rounded-lg border border-emerald-400/35 bg-emerald-950/40 px-3 py-1.5 text-sm text-emerald-100 transition hover:border-emerald-400/55"
+    <main className="chat-shell flex h-dvh flex-col overflow-hidden bg-[#0a0d14]">
+      {/* Header */}
+      <div className="chat-header shrink-0 border-b border-white/8 bg-[#0d1120]/95 backdrop-blur-xl">
+        <AppHeader
+          backHref={`/matches/${id}`}
+          title={targetName}
+          right={
+            <div className="flex items-center gap-2">
+              {targetUserId && (
+                <Link
+                  href={`/users/${targetUserId}`}
+                  className="rounded-xl border border-emerald-400/30 bg-emerald-950/40 px-3 py-1.5 text-xs text-emerald-200 transition hover:border-emerald-400/50"
+                >
+                  TA的主页
+                </Link>
+              )}
+              <button
+                type="button"
+                onClick={() => setFeedbackOpen(true)}
+                className="rounded-xl border border-rose-400/30 bg-rose-950/35 px-3 py-1.5 text-xs text-rose-200 transition hover:border-rose-400/50"
               >
-                进入TA主页
-              </Link>
-            ) : null}
+                打分
+              </button>
+            </div>
+          }
+        />
+      </div>
+
+      {/* Message list */}
+      <div
+        ref={scrollRef}
+        className="chat-messages flex-1 overflow-y-auto px-4 py-3"
+        style={{ overscrollBehavior: "contain" }}
+      >
+        {/* Load more */}
+        {hasMore && (
+          <div className="mb-3 flex justify-center">
             <button
               type="button"
-              onClick={simulateReply}
-              disabled={simulating}
-              className="text-sm text-amber-100/60 transition hover:text-amber-50 disabled:opacity-50"
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs text-amber-100/60 backdrop-blur transition hover:border-white/25 hover:text-amber-50 disabled:opacity-40"
             >
-              {simulating ? "…" : "模拟对方回复"}
-            </button>
-            <button type="button" onClick={() => setFeedbackOpen(true)} className="text-sm text-rose-200 transition hover:text-rose-100">
-              打分反馈
+              {loadingMore ? "加载中…" : "查看更早的消息"}
             </button>
           </div>
-        }
-      />
-      <div
-        className={
-          bgMode === "preset0"
-            ? "bg-transparent"
-            : bgMode === "preset1"
-              ? "bg-gradient-to-b from-rose-950/50 via-transparent to-transparent"
-              : bgMode === "preset2"
-                ? "bg-gradient-to-b from-sky-950/45 via-transparent to-transparent"
-                : bgMode === "preset3"
-                  ? "bg-gradient-to-b from-violet-950/45 via-transparent to-transparent"
-                  : bgMode === "preset4"
-                    ? "bg-gradient-to-b from-emerald-950/40 via-transparent to-transparent"
-                    : "bg-transparent"
-        }
-      >
-        <div className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto p-4">
-          <div className="glass-card mb-4 rounded-2xl p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-medium text-amber-100/80">聊天背景</p>
-              <div className="flex flex-wrap items-center gap-2">
-                {(["preset0", "preset1", "preset2", "preset3", "preset4"] as const).map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => setBgMode(m)}
-                    className={`rounded-lg border px-3 py-1 text-xs transition ${
-                      bgMode === m ? "luxury-option-active border-amber-200/40" : "luxury-option"
-                    }`}
-                  >
-                    {m === "preset0"
-                      ? "默认"
-                      : m === "preset1"
-                        ? "玫瑰"
-                        : m === "preset2"
-                          ? "天空"
-                          : m === "preset3"
-                            ? "紫调"
-                            : "青绿"}
-                  </button>
-                ))}
-                <label className="luxury-option inline-flex cursor-pointer items-center rounded-lg px-3 py-1 text-xs hover:border-amber-200/35">
-                  <span>上传</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      const MAX_BYTES = 180 * 1024;
-                      if (file.size > MAX_BYTES) {
-                        alert("背景图有点大啦，请换一张 <= 180KB 的小图～");
-                        return;
-                      }
-                      const dataUrl: string = await new Promise((resolve, reject) => {
-                        const reader = new FileReader();
-                        reader.onload = () => resolve(String(reader.result));
-                        reader.onerror = () => reject(new Error("read bg failed"));
-                        reader.readAsDataURL(file);
-                      });
-                      setBgUploadDataUrl(dataUrl);
-                      setBgMode("upload");
-                    }}
-                  />
-                </label>
+        )}
+
+        {messages.length === 0 ? (
+          <div className="flex h-full items-center justify-center">
+            <p className="text-sm text-amber-100/40">
+              还没有消息，发一句打个招呼吧 👋
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {messages.map((msg, i) => (
+              <div key={msg.id}>
+                {needsDivider(messages[i - 1], msg) && (
+                  <ChatTimeDivider label={fmtTime(msg.createdAt)} />
+                )}
+                <ChatBubble
+                  msg={msg}
+                  targetName={targetName}
+                  showReadStatus={i === messages.length - 1 || msg.pending}
+                />
               </div>
+            ))}
+          </div>
+        )}
+
+        {/* Typing indicator */}
+        {typingVisible && (
+          <div className="mt-2 flex items-end gap-2">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rose-400 to-violet-500 text-sm font-bold text-white shadow">
+              {targetName[0]}
+            </div>
+            <div className="chat-typing-indicator rounded-2xl rounded-bl-sm border border-white/10 bg-white/8 px-4 py-3 backdrop-blur-md">
+              <span /><span /><span />
             </div>
           </div>
-        <div className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-4 pb-4" style={{ paddingTop: 0 }}>
-          {messages.length === 0 ? (
-            <p className="text-center text-sm luxury-subtitle">暂无消息，发一句打个招呼吧</p>
-          ) : (
-            <div className="space-y-3">
-              {messages.map((m) => (
-                <div
-                  key={m.id}
-                  className={`flex ${m.senderType === "user_self" ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
-                      m.senderType === "user_self"
-                        ? "border border-rose-400/30 bg-rose-950/40 text-rose-50"
-                        : "border border-amber-100/15 bg-black/40 text-amber-100/90"
-                    }`}
-                  >
-                    <p className="text-xs text-amber-100/55">
-                      {m.senderType === "user_self" ? "我" : targetName}
-                    </p>
-                    <div className="mt-0.5">{renderContent(m.content)}</div>
-                    {m.senderType === "user_self" && m.readByOther ? (
-                      <p className="mt-1 text-[11px] text-emerald-300/90">对方已读</p>
-                    ) : null}
-                  </div>
+        )}
+
+        <div ref={bottomRef} className="h-1" />
+      </div>
+
+      {/* Input bar */}
+      <div className="chat-input-bar shrink-0 border-t border-white/8 bg-[#0d1120]/95 backdrop-blur-xl">
+        {/* Image preview */}
+        {selectedImageDataUrl && (
+          <div className="flex items-center gap-2 border-b border-white/8 px-4 py-2">
+            <img
+              src={selectedImageDataUrl}
+              alt="预览"
+              className="h-14 w-14 rounded-xl object-cover shadow"
+            />
+            <div className="flex-1 text-xs text-amber-100/60">已选图片</div>
+            <button
+              type="button"
+              onClick={() => setSelectedImageDataUrl(null)}
+              className="rounded-lg border border-white/15 px-3 py-1 text-xs text-amber-100/70 transition hover:border-white/30"
+            >
+              移除
+            </button>
+          </div>
+        )}
+
+        {/* Emoji panel */}
+        {showEmoji && (
+          <div className="border-b border-white/8 bg-[#0c111b]/80 px-4 py-3">
+            <div className="space-y-2">
+              {EMOJI_ROWS.map((row, ri) => (
+                <div key={ri} className="flex gap-2">
+                  {row.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => setInput((p) => p + emoji)}
+                      className="flex h-9 w-9 items-center justify-center rounded-xl text-xl transition hover:bg-white/10 active:scale-90"
+                    >
+                      {emoji}
+                    </button>
+                  ))}
                 </div>
               ))}
             </div>
-          )}
-          <div ref={bottomRef} />
-        </div>
-        </div>
-      </div>
-      <div className="border-t border-amber-200/20 bg-[#0c111b]/92 p-3 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-2xl gap-2">
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
-                placeholder="输入消息…"
-                className="luxury-input w-full rounded-xl px-3 py-2 text-sm"
-              />
-            </div>
-
-            {selectedImageDataUrl ? (
-              <div className="mt-2 flex items-center justify-between rounded-xl border border-rose-400/30 bg-rose-950/35 px-3 py-2">
-                <span className="truncate text-xs text-rose-100">已选图片</span>
-                <button
-                  type="button"
-                  className="text-xs text-rose-200 hover:text-rose-100"
-                  onClick={() => setSelectedImageDataUrl(null)}
-                >
-                  移除
-                </button>
-              </div>
-            ) : null}
-
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {emojiOptions.map((e) => (
-                <button
-                  key={e}
-                  type="button"
-                  className="rounded-md border border-amber-100/15 bg-black/30 px-2 py-1 text-sm text-amber-50 transition hover:border-amber-200/35"
-                  onClick={() => setInput((prev) => (prev ? prev + e : e))}
-                >
-                  {e}
-                </button>
-              ))}
-              <label className="inline-flex cursor-pointer items-center rounded-md border border-amber-100/15 bg-black/30 px-2 py-1 text-sm text-amber-50 transition hover:border-amber-200/35">
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(ev) => onPickImage(ev.target.files?.[0] ?? null)}
-                />
-                📷
-              </label>
-            </div>
           </div>
+        )}
+
+        {/* Text input row */}
+        <div className="flex items-end gap-2 px-3 py-3">
+          {/* Emoji toggle */}
+          <button
+            type="button"
+            onClick={() => setShowEmoji((v) => !v)}
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xl transition ${
+              showEmoji
+                ? "bg-amber-400/20 text-amber-300"
+                : "text-amber-100/50 hover:text-amber-100/80"
+            }`}
+          >
+            😊
+          </button>
+
+          {/* Textarea */}
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={onInputChange}
+            onKeyDown={onKeyDown}
+            placeholder="发消息…"
+            rows={1}
+            className="chat-textarea flex-1 resize-none rounded-2xl border border-white/15 bg-white/8 px-4 py-2.5 text-sm text-amber-50 placeholder-amber-100/35 outline-none backdrop-blur transition focus:border-rose-400/40 focus:bg-white/12 focus:ring-1 focus:ring-rose-400/20"
+            style={{ height: "40px", maxHeight: "120px" }}
+          />
+
+          {/* Image */}
+          <label className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl text-xl text-amber-100/50 transition hover:text-amber-100/80">
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => onPickImage(e.target.files?.[0] ?? null)}
+            />
+            📷
+          </label>
+
+          {/* Send */}
           <button
             type="button"
             onClick={send}
-            disabled={sending}
-            className="luxury-btn h-fit self-end rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50"
+            disabled={sending || (!input.trim() && !selectedImageDataUrl)}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500 to-rose-600 text-white shadow-md shadow-rose-500/30 transition active:scale-95 disabled:opacity-40"
           >
-            {sending ? "发送中…" : "发送"}
+            {sending ? (
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            ) : (
+              <svg className="h-5 w-5 -rotate-45 translate-x-0.5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+              </svg>
+            )}
           </button>
         </div>
       </div>
+
       <MatchFeedbackModal
         matchId={id}
         open={feedbackOpen}

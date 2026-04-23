@@ -40,10 +40,14 @@ export async function GET(
   const limitRaw = request.nextUrl.searchParams.get("limit");
   const limit = Math.min(120, Math.max(10, Number(limitRaw ?? "60") || 60));
 
+  const beforeRaw = request.nextUrl.searchParams.get("before");
+  const beforeDate = beforeRaw ? new Date(beforeRaw) : null;
+
   const rawMessages = await prisma.matchMessage.findMany({
     where: {
       matchId: { in: pairMatches.map((m) => m.id) },
       senderType: { in: ["user_self", "user_target"] },
+      ...(beforeDate ? { createdAt: { lt: beforeDate } } : {}),
     },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: limit,

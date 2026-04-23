@@ -149,7 +149,7 @@ export default function ReportPage() {
                   )}
                 </>
               ) : (
-                <p className="luxury-subtitle">暂无评分报告，完成 Agent 对话后将生成</p>
+                <p className="luxury-subtitle">暂无评分报告，匹配成功并写入分数后将在此展示</p>
               )}
             </div>
           </div>
@@ -157,8 +157,8 @@ export default function ReportPage() {
 
         {!hasScore && (
           <p className="text-center text-sm text-amber-100/65">
-            <Link href={`/matches/${id}/agent-chat`} className="text-amber-200 underline underline-offset-2">
-              去看双方 Agent 初识对话
+            <Link href={`/matches/${id}`} className="text-amber-200 underline underline-offset-2">
+              返回匹配详情
             </Link>
           </p>
         )}

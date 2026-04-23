@@ -19,6 +19,15 @@ export function setSessionCookie(value: string) {
     maxAge: 60 * 60 * 24 * 7,
   });
 }
+export function setSessionCookieWithOptions(value: string, options?: { remember?: boolean }) {
+  const remember = options?.remember ?? true;
+  cookies().set(SESSION_COOKIE, value, {
+    path: "/",
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    ...(remember ? { maxAge: 60 * 60 * 24 * 30 } : {}),
+  });
+}
 
 export function clearSessionCookie() {
   cookies().delete(SESSION_COOKIE);

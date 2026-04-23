@@ -11,5 +11,9 @@ out
 dev.db
 .vercel
 
+# 本地/CI 生成的大文件（Vercel 上可用 bundle 脚本在构建后生成，勿提交）
+public/designer-handoff-embedded.html
+public/ui-screenshots/
+
 # TypeScript
 *.tsbuildinfo

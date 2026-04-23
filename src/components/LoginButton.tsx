@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 type LoginButtonProps = {
   redirectTo?: string;
@@ -14,6 +15,7 @@ export function LoginButton({ redirectTo = "/" }: LoginButtonProps) {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
 
   const submit = async () => {
     if (!email.trim()) {
@@ -39,19 +41,57 @@ export function LoginButton({ redirectTo = "/" }: LoginButtonProps) {
     const url = mode === "register" ? "/api/auth/register" : "/api/auth/local-login";
     const body =
       mode === "register"
-        ? { email, password, name: name.trim() || "新用户" }
-        : { email, password };
+        ? { email, password, name: name.trim() || "新用户", rememberMe }
+        : { email, password, rememberMe };
     try {
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const data = await res.json().catch(() => null);
+      const raw = await res.text();
+      let data: { code?: number; message?: string } | null = null;
+      try {
+        data = raw ? (JSON.parse(raw) as { code?: number; message?: string }) : null;
+      } catch {
+        data = null;
+      }
       if (!res.ok || data?.code !== 0) {
-        setError(data?.message || "操作失败，请稍后重试");
+        const fallback =
+          !data && res.status >= 500
+            ? `服务器错误 (${res.status})，请查看终端/服务端日志`
+            : "操作失败，请稍后重试";
+        setError(data?.message || fallback);
       } else {
         window.location.href = mode === "register" ? "/onboarding" : redirectTo;
+      }
+    } catch {
+      setError("网络错误，请稍后重试");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const guestLogin = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/auth/guest", { method: "POST" });
+      const raw = await res.text();
+      let data: { code?: number; message?: string } | null = null;
+      try {
+        data = raw ? (JSON.parse(raw) as { code?: number; message?: string }) : null;
+      } catch {
+        data = null;
+      }
+      if (!res.ok || data?.code !== 0) {
+        const fallback =
+          !data && res.status >= 500
+            ? `服务器错误 (${res.status})，请查看终端/服务端日志`
+            : "免登录进入失败，请稍后重试";
+        setError(data?.message || fallback);
+      } else {
+        window.location.href = redirectTo;
       }
     } catch {
       setError("网络错误，请稍后重试");
@@ -118,6 +158,22 @@ export function LoginButton({ redirectTo = "/" }: LoginButtonProps) {
           className="luxury-input w-full rounded-xl px-3 py-2.5 text-sm"
         />
       )}
+      {mode === "login" && (
+        <div className="flex items-center justify-between text-xs">
+          <label className="inline-flex cursor-pointer items-center gap-2 text-amber-100/75">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="accent-amber-400"
+            />
+            记住密码（30 天）
+          </label>
+          <Link href="/auth/forgot-password" className="text-amber-200 underline underline-offset-2">
+            忘记密码？
+          </Link>
+        </div>
+      )}
       {error && <p className="text-xs text-rose-300">{error}</p>}
 
       <button
@@ -135,6 +191,15 @@ export function LoginButton({ redirectTo = "/" }: LoginButtonProps) {
       >
         或使用 SecondMe 登录
       </a>
+
+      <button
+        type="button"
+        onClick={guestLogin}
+        disabled={loading}
+        className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-white/5 px-6 py-3 text-sm text-amber-100/90 transition hover:bg-white/10 disabled:opacity-70"
+      >
+        免登录先逛逛
+      </button>
     </div>
   );
 }

@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>丘比（Qiubi）— UI/设计沟通稿</title>
+  <style>
+    :root {
+      --bg: #07090f;
+      --card: rgba(17, 20, 30, 0.9);
+      --line: rgba(230, 206, 151, 0.22);
+      --text: #f6f1e8;
+      --muted: #b3a58b;
+      --accent: #ebc87a;
+      --accent2: #f43f5e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, "PingFang SC", "Segoe UI", "Microsoft YaHei", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      background-image:
+        radial-gradient(900px 600px at 8% 8%, rgba(151, 106, 255, 0.14), transparent 60%),
+        radial-gradient(800px 520px at 100% 0%, rgba(47, 171, 255, 0.1), transparent 58%);
+      line-height: 1.55;
+      padding: 2rem 1.25rem 3.5rem;
+    }
+    .wrap { max-width: 960px; margin: 0 auto; }
+    .tag {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent2);
+      margin-bottom: 0.5rem;
+    }
+    header { border-bottom: 1px solid var(--line); padding-bottom: 1.5rem; margin-bottom: 1.75rem; }
+    h1 { font-size: 1.65rem; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 0.5rem; }
+    .meta { color: var(--muted); font-size: 0.9rem; margin: 0; }
+    .share-box {
+      background: rgba(235, 200, 122, 0.08);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 1rem 1.15rem;
+      margin: 1.5rem 0 2rem;
+      font-size: 0.88rem;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+    .share-box strong { color: var(--text); }
+    h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin: 2rem 0 0.65rem;
+      color: var(--accent);
+      border-left: 3px solid var(--accent2);
+      padding-left: 0.6rem;
+    }
+    h3 { font-size: 0.95rem; margin: 1.15rem 0 0.45rem; color: var(--text); }
+    p, li { color: var(--muted); font-size: 0.92rem; }
+    p.lead { font-size: 1.02rem; color: var(--text); max-width: 60ch; }
+    ul { margin: 0.4rem 0 0.8rem; padding-left: 1.2rem; }
+    li { margin: 0.3rem 0; }
+    .pill {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 0.2rem 0.5rem;
+      border-radius: 6px;
+      background: rgba(235, 200, 122, 0.12);
+      color: var(--accent);
+      border: 1px solid rgba(235, 200, 122, 0.25);
+      margin: 0 0.3rem 0.35rem 0;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin: 0.6rem 0; }
+    th, td { border: 1px solid var(--line); padding: 0.5rem 0.55rem; text-align: left; vertical-align: top; }
+    th { background: rgba(255, 255, 255, 0.04); color: var(--accent); font-weight: 600; }
+    code { font-family: ui-monospace, "Cascadia Code", monospace; font-size: 0.8em; background: rgba(0, 0, 0, 0.35); padding: 0.1em 0.35em; border-radius: 4px; color: #f0dcc8; }
+    .shots {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 1.1rem;
+      margin-top: 0.9rem;
+    }
+    figure.shot {
+      margin: 0;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    figure.shot figcaption {
+      padding: 0.5rem 0.65rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--accent);
+      border-bottom: 1px solid var(--line);
+    }
+    figure.shot .shot-body {
+      min-height: 180px;
+      background: rgba(0, 0, 0, 0.4);
+    }
+    figure.shot img { width: 100%; height: auto; display: block; vertical-align: middle; }
+    .shot-placeholder { padding: 1.2rem; text-align: center; font-size: 0.8rem; color: var(--muted); }
+    .schematic-frame {
+      margin-top: 0.75rem;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+      background: #05070d;
+      min-height: 200px;
+    }
+    .schematic-frame iframe {
+      display: block;
+      width: 100%;
+      min-height: 1520px;
+      border: 0;
+    }
+    footer {
+      margin-top: 2.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--line);
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    @media print {
+      body { background: #fff; color: #111; }
+      .share-box { break-inside: avoid; }
+      h2 { color: #333; }
+      p, li, .meta, footer, .shot-placeholder { color: #333; }
+      th, td { border-color: #ccc; }
+      .schematic-frame iframe { min-height: 1200px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <span class="tag">Design handoff</span>
+    <header>
+      <h1>丘比（Qiubi）— UI/设计沟通稿</h1>
+      <p class="meta">给 UI/视觉设计师的<strong>单页静态稿</strong>：产品摘要 + 主要界面参考图。无需打开 App、不嵌入实时试玩页。</p>
+    </header>
+
+    <div class="share-box" style="border-color:rgba(74,222,128,0.25)">
+      <strong>要「单文件、图片全在 HTML 里」发给对方？</strong>在已有截图的前提下执行 <code>npm run bundle:designer</code>，会生成 <code>public/designer-handoff-embedded.html</code>：PNG 与 <code>town-schematics.html</code> 均以 <code>data:</code> 内嵌，<strong>只发这 1 个 HTML 即可</strong>（文件会较大，属正常）。<br />
+      更新内嵌图：<code>npm run capture:ui</code> → 再 <code>npm run bundle:designer</code>。
+    </div>
+    <div class="share-box">
+      <strong>多文件打包法（不跑 bundle 时）：</strong><br />
+      1）本文件 <code>designer-handoff.html</code> 与 <code>ui-screenshots/</code>、<code>town-schematics.html</code> 放同一层目录后 zip；<br />
+      2）或浏览器<strong>打印 → 另存为 PDF</strong>；<br />
+      3）更新截图先 <code>npm run dev:3456</code>，再 <code>npm run capture:ui</code>。
+    </div>
+
+    <section>
+      <h2>一、产品摘要看这个就够</h2>
+      <p class="lead">
+        <strong>丘比</strong>是「真实心动匹配」向交友应用：用户配置心动偏好与阈值，系统做候选池 <strong>双向条件筛选</strong>，结合 <strong>资料向量与合拍分</strong> 产出结果；匹配解锁后可 <strong>真人聊天</strong> 与查看 <strong>评分报告/关系向洞察</strong>。产品还集成 <strong>SecondMe</strong> 数字体与 <strong>丘比小镇</strong>（社区发帖、探索、消息、1v1 对话）。
+      </p>
+      <p>
+        <span class="pill">主流程</span>
+        <span class="pill">匹配流水线可视化</span>
+        <span class="pill">小镇 / 对话</span>
+        <span class="pill">移动端优先</span>
+      </p>
+      <h3>设计师需要知道的能力边界（一句话）</h3>
+      <ul>
+        <li>账号：SecondMe OAuth、本地邮箱、访客、找回密码。</li>
+        <li>核心：引导 / 心动设置 / 开启匹配 / 匹配列表与详情 / 聊天（类微信气泡+SSE）/ 报告与关系页。</li>
+        <li>社区：<code>/town</code> 系列（首页、探索、消息、我的需求、帖子下对话等）。</li>
+      </ul>
+      <p>
+        更细的界面与组件约定见仓库 <code>UI-SPEC.md</code>、<code>UI-SPEC-FIGMA.md</code>、<code>FEATURES.md</code>；本页负责<strong>一眼看全主要屏 + 可分享</strong>。
+      </p>
+    </section>
+
+    <section>
+      <h2>二、主要界面参考图（PNG）</h2>
+      <p>下列图片路径为 <code>ui-screenshots/&lt;文件名&gt;.png</code>，与开发脚本 <code>npm run capture:ui</code> 输出一致。若包内缺少 PNG，请先跑截图脚本再打包。</p>
+      <div class="shots" id="shots"></div>
+      <p id="shot-note" style="margin-top:1rem; font-size:0.86rem; color: var(--muted); display:none"></p>
+    </section>
+
+    <section>
+      <h2>三、丘比小镇四页线框（结构示意，非真机截屏）</h2>
+      <p>与 <code>src/app/town</code> 下页面结构对应，便于对齐布局与信息层级。内嵌为同目录 <code>town-schematics.html</code>，离线打包时请一并放入。</p>
+      <div class="schematic-frame" id="schematicBox">
+        <iframe title="丘比小镇四页线框" src="town-schematics.html"></iframe>
+      </div>
+    </section>
+
+    <section>
+      <h2>四、截图与路由速查</h2>
+      <table>
+        <thead>
+          <tr><th>参考图</th><th>路由</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>home.png</td><td><code>/</code></td><td>首页</td></tr>
+          <tr><td>auth.png</td><td><code>/auth</code></td><td>登录 / 注册</td></tr>
+          <tr><td>privacy.png</td><td><code>/privacy</code></td><td>隐私政策</td></tr>
+          <tr><td>intro-quiz.png</td><td><code>/intro/quiz</code></td><td>自我介绍测验</td></tr>
+          <tr><td>onboarding.png</td><td><code>/onboarding</code></td><td>新用户引导</td></tr>
+          <tr><td>match-start.png</td><td><code>/match-start</code></td><td>开启匹配流水线</td></tr>
+          <tr><td>heartbeat.png</td><td><code>/settings/heartbeat</code></td><td>心动设置</td></tr>
+          <tr><td>matches.png</td><td><code>/matches</code></td><td>匹配列表</td></tr>
+          <tr><td>town.png</td><td><code>/town</code></td><td>小镇入口</td></tr>
+          <tr><td>town-explore.png</td><td><code>/town/explore</code></td><td>探索 / 广场</td></tr>
+          <tr><td>town-messages.png</td><td><code>/town/messages</code></td><td>小镇消息</td></tr>
+          <tr><td>town-my-needs.png</td><td><code>/town/my-needs</code></td><td>发布与我的需求</td></tr>
+        </tbody>
+      </table>
+      <p>
+        带动态 id 的屏（如 <code>/matches/[id]/chat</code>、<code>/town/conversations/[id]</code>）无固定图，需在实际环境中打开对应地址再自行截屏，或看 <code>UI-SPEC</code> 中说明。
+      </p>
+    </section>
+
+    <section>
+      <h2>五、技术栈（给设计联调时参考）</h2>
+      <table>
+        <thead>
+          <tr><th>项</th><th>值</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>框架</td><td>Next.js 14（App Router）</td></tr>
+          <tr><td>UI</td><td>React 18、Tailwind CSS 3、全局动效/主题 token</td></tr>
+          <tr><td>数据</td><td>PostgreSQL、Prisma</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer>
+      本页仅作设计沟通与归档；与线上逻辑以 <code>src/app</code> 为准。仓库内亦保留 <code>PROJECT-SUMMARY.html</code>（更长的项目总结+截图占位）供研发自用。
+    </footer>
+  </div>
+
+  <script>
+    (function () {
+      var shots = [
+        { file: "home.png", label: "首页 /" },
+        { file: "auth.png", label: "登录 /auth" },
+        { file: "privacy.png", label: "隐私 /privacy" },
+        { file: "intro-quiz.png", label: "测验 /intro/quiz" },
+        { file: "onboarding.png", label: "引导 /onboarding" },
+        { file: "match-start.png", label: "开启匹配 /match-start" },
+        { file: "heartbeat.png", label: "心动设置 /settings/heartbeat" },
+        { file: "matches.png", label: "匹配列表 /matches" },
+        { file: "town.png", label: "小镇 /town" },
+        { file: "town-explore.png", label: "小镇探索 /town/explore" },
+        { file: "town-messages.png", label: "小镇消息 /town/messages" },
+        { file: "town-my-needs.png", label: "我的需求 /town/my-needs" },
+      ];
+      var root = document.getElementById("shots");
+      for (var i = 0; i < shots.length; i++) {
+        var s = shots[i];
+        var fig = document.createElement("figure");
+        fig.className = "shot";
+        var cap = document.createElement("figcaption");
+        cap.textContent = s.label;
+        var body = document.createElement("div");
+        body.className = "shot-body";
+        var img = document.createElement("img");
+        img.alt = s.label;
+        img.src = "ui-screenshots/" + s.file;
+        (function (imgEl, bodyEl, fileName) {
+          imgEl.onerror = function () {
+            imgEl.style.display = "none";
+            if (bodyEl.querySelector(".shot-placeholder")) return;
+            var ph = document.createElement("div");
+            ph.className = "shot-placeholder";
+            ph.innerHTML = "无此图：将 <code>" + fileName + "</code> 放入 <code>ui-screenshots/</code> 或本机执行 <code>npm run capture:ui</code> 生成。";
+            bodyEl.appendChild(ph);
+          };
+        })(img, body, s.file);
+        body.appendChild(img);
+        fig.appendChild(cap);
+        fig.appendChild(body);
+        root.appendChild(fig);
+      }
+      window.addEventListener("load", function () {
+        var sn = document.getElementById("shot-note");
+        if (!sn || !root) return;
+        var n = root.querySelectorAll(".shot-placeholder").length;
+        if (n > 0) {
+          sn.style.display = "block";
+          sn.textContent = "有 " + n + " 张图未成功加载。打包前请补全与 HTML 同级的 ui-screenshots/，再发设计师。";
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

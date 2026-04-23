@@ -34,7 +34,8 @@ function OnboardingInner() {
         setSubmitting(false);
         return;
       }
-      window.location.href = returnTo.startsWith("/") ? returnTo : "/";
+      const nextReturn = returnTo.startsWith("/") ? returnTo : "/";
+      window.location.href = `/onboarding/paradise?return=${encodeURIComponent(nextReturn)}`;
     } catch {
       setError("网络异常，请重试");
       setSubmitting(false);

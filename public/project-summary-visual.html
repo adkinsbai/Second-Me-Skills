@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>丘比 — 界面实时预览（iframe）</title>
+  <style>
+    :root {
+      --bg: #05070d;
+      --card: #111520;
+      --line: rgba(230, 206, 151, 0.2);
+      --text: #f6f1e8;
+      --muted: #8a7e68;
+      --accent: #ebc87a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, "PingFang SC", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 1.5rem 1rem 3rem;
+    }
+    .wrap { max-width: 1400px; margin: 0 auto; }
+    h1 { font-size: 1.4rem; margin: 0 0 0.5rem; }
+    .hint {
+      background: rgba(235, 200, 122, 0.1);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 1rem 1.1rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.9rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .hint strong { color: var(--accent); }
+    .hint code { background: rgba(0,0,0,0.35); padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.85em; }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      margin-bottom: 1.25rem;
+    }
+    .toolbar label { font-size: 0.85rem; color: var(--muted); }
+    .toolbar input[type="text"] {
+      flex: 1;
+      min-width: 200px;
+      padding: 0.5rem 0.75rem;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--card);
+      color: var(--text);
+    }
+    .toolbar button {
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      border: 1px solid var(--accent);
+      background: rgba(235, 200, 122, 0.15);
+      color: var(--accent);
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 1.5rem;
+    }
+    .device {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+    }
+    .device h2 {
+      margin: 0;
+      padding: 0.65rem 1rem;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent);
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .device h2 span { font-weight: 500; color: var(--muted); font-size: 0.75rem; text-transform: none; letter-spacing: 0; }
+    .frame-wrap {
+      height: 520px;
+      overflow: hidden;
+      background: #000;
+      position: relative;
+    }
+    .frame-wrap iframe {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      width: 390px;
+      height: 844px;
+      border: 0;
+      transform: translateX(-50%) scale(0.52);
+      transform-origin: top center;
+    }
+    .custom .frame-wrap { height: 640px; }
+    .custom .frame-wrap iframe {
+      transform: translateX(-50%) scale(0.58);
+    }
+    .schematics-block {
+      margin-top: 2.25rem;
+      padding-top: 1.75rem;
+      border-top: 1px solid var(--line);
+    }
+    .schematics-block h2 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin: 0 0 0.5rem;
+    }
+    .schematics-block .schematics-note {
+      font-size: 0.88rem;
+      color: var(--muted);
+      line-height: 1.55;
+      margin: 0 0 1rem;
+      max-width: 80ch;
+    }
+    .schematics-block .schematics-note code {
+      background: rgba(0, 0, 0, 0.35);
+      padding: 0.12em 0.4em;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+    .schematics-frame {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+      background: #07090f;
+      min-height: 400px;
+    }
+    .schematics-frame iframe {
+      display: block;
+      width: 100%;
+      min-height: 400px;
+      border: 0;
+      vertical-align: top;
+    }
+    footer {
+      margin-top: 2rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>丘比 · 各页面实时界面</h1>
+    <div class="hint">
+      <strong>如何使用：</strong>先在项目目录执行 <code>npm run dev:3456</code>，再用浏览器打开本页：
+      <strong><a href="/project-summary-visual.html">http://127.0.0.1:3456/project-summary-visual.html</a></strong>
+      （必须与 App 同源，iframe 才能加载各路由。）<br />
+      首次打开时若未登录，会自动创建<strong>访客账号</strong>并刷新一次，以便小镇等页面不再被重定向到登录页
+      （需数据库可写；若访客失败，小镇 iframe 仍可能停在登录，可对照下方<strong>结构示意图</strong>）；
+      若你已手动登录，则不会创建访客。带 <code>[id]</code> 的页面请在底部「自定义路径」中粘贴完整地址。
+    </div>
+
+    <div class="toolbar">
+      <label>自定义预览路径（含域名或相对路径）：</label>
+      <input type="text" id="customUrl" placeholder="/matches/你的matchId/chat 或完整 http://127.0.0.1:3456/..." />
+      <button type="button" id="loadCustom">加载到下方预览框</button>
+    </div>
+
+    <div class="grid" id="grid"></div>
+
+    <section class="schematics-block" aria-label="丘比小镇页面结构静态示意">
+      <h2>丘比小镇 — 四页结构示意（按代码重排，非 App 内截图）</h2>
+      <p class="schematics-note">
+        与上方实时 iframe 对应同一组路由（<code>/town</code>、<code>/town/explore</code>、<code>/town/messages</code>、<code>/town/my-needs</code>）；
+        下图为 <code>public/town-schematics.html</code> 内嵌，由仓库内 <code>src/app/town/**/page.tsx</code> 的 DOM/样式意图静态绘制，<strong>不依赖</strong>登录、数据库与 Playwright。上方 iframe 为真实运行态，此处为可归档的线框+色块示意。
+      </p>
+      <div class="schematics-frame">
+        <iframe
+          id="townSchematicsFrame"
+          title="丘比小镇四页结构示意"
+          src="/town-schematics.html"
+          loading="lazy"
+        ></iframe>
+      </div>
+    </section>
+
+    <div class="device custom" id="customBox" style="margin-top:1.5rem; max-width: 420px;">
+      <h2>自定义页面 <span id="customLabel">未加载</span></h2>
+      <div class="frame-wrap">
+        <iframe id="customFrame" title="自定义预览" src="about:blank"></iframe>
+      </div>
+    </div>
+
+    <footer>
+      实时 iframe 下方已内嵌 <code>town-schematics.html</code> 小镇四页线框示意；另有离线 PNG 可执行 <code>npm run capture:ui</code>（需 <code>dev:3456</code> 与 Playwright），输出到 <code>public/ui-screenshots/</code> 后在 <code>PROJECT-SUMMARY.html</code> 中查看。
+    </footer>
+  </div>
+
+  <script>
+    const PAGES = [
+      { title: "首页", path: "/" },
+      { title: "登录 / 注册", path: "/auth" },
+      { title: "隐私政策", path: "/privacy" },
+      { title: "自我介绍测验", path: "/intro/quiz" },
+      { title: "新用户引导", path: "/onboarding" },
+      { title: "开启匹配（流水线）", path: "/match-start" },
+      { title: "心动设置", path: "/settings/heartbeat" },
+      { title: "匹配列表", path: "/matches" },
+      { title: "丘比小镇", path: "/town" },
+      { title: "小镇 · 探索", path: "/town/explore" },
+      { title: "小镇 · 消息", path: "/town/messages" },
+      { title: "小镇 · 我的需求", path: "/town/my-needs" },
+    ];
+
+    function buildGrid() {
+      const grid = document.getElementById("grid");
+      grid.innerHTML = "";
+      for (const { title, path } of PAGES) {
+        const el = document.createElement("div");
+        el.className = "device";
+        el.innerHTML =
+          '<h2>' +
+          title +
+          ' <span>' +
+          path +
+          "</span></h2>" +
+          '<div class="frame-wrap"><iframe title="' +
+          title.replace(/"/g, "") +
+          '" loading="lazy" src="' +
+          path +
+          '"></iframe></div>';
+        grid.appendChild(el);
+      }
+    }
+
+    (async function ensureSessionThenGrid() {
+      try {
+        const meRes = await fetch("/api/me", { credentials: "include" });
+        const meData = await meRes.json().catch(() => ({}));
+        if (!meData?.user) {
+          const g = await fetch("/api/auth/guest", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: "{}",
+          });
+          if (g.ok) {
+            location.reload();
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn("guest bootstrap", e);
+      }
+      buildGrid();
+    })();
+
+    function resolveUrl(raw) {
+      const t = (raw || "").trim();
+      if (!t) return "";
+      if (t.startsWith("http://") || t.startsWith("https://")) return t;
+      return t.startsWith("/") ? t : "/" + t;
+    }
+
+    document.getElementById("loadCustom").addEventListener("click", () => {
+      const raw = document.getElementById("customUrl").value;
+      const u = resolveUrl(raw);
+      const iframe = document.getElementById("customFrame");
+      const label = document.getElementById("customLabel");
+      if (!u) {
+        label.textContent = "请输入路径";
+        return;
+      }
+      iframe.src = u;
+      label.textContent = u;
+    });
+
+    (function sizeTownSchematics() {
+      const f = document.getElementById("townSchematicsFrame");
+      if (!f) return;
+      function apply() {
+        try {
+          const doc = f.contentWindow.document;
+          const h = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight, 400);
+          f.style.height = h + 24 + "px";
+        } catch (e) {
+          f.style.minHeight = "2000px";
+        }
+      }
+      f.addEventListener("load", apply);
+    })();
+  </script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 import { getOwnerInformationText } from "@/lib/ownerInformation";
-import { TOWN_CATEGORY_TAXONOMY, type TownCategory, extractJsonArray } from "@/lib/townTaxonomy";
+import { TOWN_CATEGORY_TAXONOMY, type TownCategory, extractJsonArray, normalizeTownCategory } from "@/lib/townTaxonomy";
 
 const BASE_URL = process.env.SECONDME_API_BASE_URL;
 
@@ -78,7 +78,8 @@ export async function classifyTownCategoriesSecondMe(accessToken: string, postCo
   for (const x of arr) {
     const s = String(x ?? "").trim();
     if (!s) continue;
-    if ((TOWN_CATEGORY_TAXONOMY as readonly string[]).includes(s)) normalized.push(s as TownCategory);
+    const mapped = normalizeTownCategory(s);
+    if (mapped) normalized.push(mapped);
   }
   if (normalized.length === 0) return null;
   // 去重 + 只保留最多 3 个

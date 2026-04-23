@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { buildDemoReport } from "@/lib/demoMatchReport";
 import { getScheduleWindow } from "@/lib/matchSchedule";
-import { inferUserModel, scoreCompatibility } from "@/lib/userModeling";
+import { runMatchPipeline } from "@/lib/matchPipeline";
 
 function normScore(v: number): number {
   return Math.max(0, Math.min(100, Math.round(v)));
@@ -72,6 +72,7 @@ export async function POST() {
       data: {
         message: `小丘比还在认真挑选中～今晚 ${schedule.time} 见，我会把更合拍的人悄悄放进你的主页里。`,
         waitingUntil: schedule.dispatchAtUtc.toISOString(),
+        pipeline: null,
       },
     });
   }
@@ -85,6 +86,7 @@ export async function POST() {
       data: {
         message: `今天的心动额度已经用完啦（${DAILY_MATCH_LIMIT}/${DAILY_MATCH_LIMIT}）～先去和喜欢的人聊聊，明天再来拆新盲盒叭！`,
         alreadyMatchedToday: true,
+        pipeline: null,
       },
     });
   }
@@ -95,106 +97,45 @@ export async function POST() {
   });
   const excludeIds = [user.id, ...matchedTargetIds.map((x) => x.targetUserId)];
 
-  const selfFactsRows = await prisma.ownerFact.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: "desc" },
-    take: 30,
-    select: { content: true },
-  });
-  const selfMsgRows = await prisma.matchMessage.findMany({
-    where: { senderType: "user_self", match: { userId: user.id } },
-    orderBy: { createdAt: "desc" },
-    take: 40,
-    select: { content: true, createdAt: true },
-  });
-  const selfModel = inferUserModel({
-    userId: user.id,
-    bio: dbUser.bio,
-    keywords: dbUser.preference?.keywords ?? null,
-    matchTypes: dbUser.preference?.matchTypes ?? null,
-    chatPace: dbUser.preference?.chatPace ?? null,
-    meetPreference: dbUser.preference?.meetPreference ?? null,
-    emotionStyle: dbUser.preference?.emotionStyle ?? null,
-    activityTags: dbUser.preference?.activityTags ?? null,
-    ownerFacts: selfFactsRows.map((x) => x.content),
-    userMessages: selfMsgRows.map((x) => x.content),
-    userMessageCreatedAt: selfMsgRows.map((x) => x.createdAt),
-  });
+  const { stages, ranked, selfModel } = await runMatchPipeline(user.id, excludeIds);
 
-  const poolCandidates = await prisma.user.findMany({
-    where: {
-      id: { notIn: excludeIds },
-      authProvider: { not: "" },
-    },
-    include: { preference: true },
-    take: 40,
-  });
-
-  const rankedRaw = await Promise.all(
-    poolCandidates.map(async (candidate) => {
-      const selfRegion = dbUser.preference?.region?.trim().toLowerCase() ?? "";
-      const targetRegion = candidate.preference?.region?.trim().toLowerCase() ?? "";
-      if (selfRegion && targetRegion && selfRegion !== targetRegion) return null;
-      const a1 = dbUser.preference?.ageMin;
-      const a2 = dbUser.preference?.ageMax;
-      const b1 = candidate.preference?.ageMin;
-      const b2 = candidate.preference?.ageMax;
-      if (a1 != null && a2 != null && b1 != null && b2 != null && Math.max(a1, b1) > Math.min(a2, b2)) {
-        return null;
-      }
-      const factsRows = await prisma.ownerFact.findMany({
-        where: { userId: candidate.id },
-        orderBy: { createdAt: "desc" },
-        take: 20,
-        select: { content: true },
-      });
-      const msgRows = await prisma.matchMessage.findMany({
-        where: { senderType: "user_self", match: { userId: candidate.id } },
-        orderBy: { createdAt: "desc" },
-        take: 30,
-        select: { content: true, createdAt: true },
-      });
-      const targetModel = inferUserModel({
-        userId: candidate.id,
-        bio: candidate.bio,
-        keywords: candidate.preference?.keywords ?? null,
-        matchTypes: candidate.preference?.matchTypes ?? null,
-        chatPace: candidate.preference?.chatPace ?? null,
-        meetPreference: candidate.preference?.meetPreference ?? null,
-        emotionStyle: candidate.preference?.emotionStyle ?? null,
-        activityTags: candidate.preference?.activityTags ?? null,
-        ownerFacts: factsRows.map((x) => x.content),
-        userMessages: msgRows.map((x) => x.content),
-        userMessageCreatedAt: msgRows.map((x) => x.createdAt),
-      });
-      const scored = scoreCompatibility(selfModel, targetModel);
-      if (scored.hardRejectReasons.length > 0) return null;
-      return { candidate, targetModel, scored };
-    })
-  );
   const remainingSlots = Math.max(0, DAILY_MATCH_LIMIT - todayCount);
-  const ranked = rankedRaw
-    .filter((x): x is NonNullable<typeof x> => !!x)
-    .sort((a, b) => b.scored.finalScore - a.scored.finalScore)
+  const picks = ranked
+    .filter((pick) => {
+      const targetThreshold = pick.candidate.preference?.heartThreshold ?? 70;
+      return pick.scored.finalScore >= threshold && pick.scored.finalScore >= targetThreshold;
+    })
     .slice(0, Math.min(3, remainingSlots));
 
-  if (ranked.length === 0) {
+  const finalStages = [
+    ...stages,
+    {
+      id: "mutual_threshold",
+      title: "双向心动阈值",
+      detail: `双方综合分都 ≥ 各自心动阈值（你 ${threshold}）`,
+      count: picks.length,
+    },
+  ];
+
+  if (picks.length === 0) {
     return NextResponse.json({
       code: 0,
       data: {
-        message: "呜噜～今天暂时没遇到特别对味的人，我再努力找找，晚点或明天来看看新的小惊喜呀。",
+        message:
+          ranked.length === 0
+            ? "呜噜～当前样本里没有同时满足「双向心动设置」且合拍度足够的对象，可先完善资料/心动设置，或晚点再试。"
+            : "有合拍候选，但尚未同时达到你们双方的心动阈值；可调低阈值或改天再试。",
         noQualifiedCandidates: true,
+        pipeline: { stages: finalStages },
       },
     });
   }
 
   const createdMatchIds: string[] = [];
-  for (const pick of ranked) {
+  for (const pick of picks) {
     const targetThreshold = pick.candidate.preference?.heartThreshold ?? 70;
     const status =
-      pick.scored.finalScore >= threshold && pick.scored.finalScore >= targetThreshold
-        ? "connected"
-        : "screening";
+      pick.scored.finalScore >= threshold && pick.scored.finalScore >= targetThreshold ? "connected" : "screening";
     const outcome = status === "connected" ? "success" : "fail";
     const lifeStoryScore = normScore((selfModel.dialogDepth + pick.targetModel.dialogDepth) / 2);
     const metrics = {
@@ -212,6 +153,7 @@ export async function POST() {
       ...demoReport,
       matchExplain: pick.scored.explain,
       recommendationReasons: [
+        `向量相似度（资料空间） ${Math.round(pick.scored.explain.vectorSimilarity * 100)}%`,
         `沟通节奏匹配度 ${pick.scored.explain.rhythm}%`,
         `情绪互补度 ${pick.scored.explain.emotion}%`,
         `价值观契合度 ${pick.scored.explain.values}%`,
@@ -249,6 +191,7 @@ export async function POST() {
       message: `叮咚！今天先给你安排了 ${createdMatchIds.length} 位心动候选，慢慢看，不着急，喜欢最重要～`,
       thresholdAdjustedTo: threshold,
       thresholdHint: dynamic.hint || null,
+      pipeline: { stages: finalStages },
     },
   });
 }
