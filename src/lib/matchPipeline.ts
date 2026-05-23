@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import type { Prisma, User, UserPreference } from "@prisma/client";
+import type { Prisma, User, UserPreference, UserPreferenceSignal } from "@prisma/client";
 import { inferUserModel, scoreCompatibility, type UserModel } from "@/lib/userModeling";
 
 const MAX_SCAN = 500;
@@ -11,7 +11,48 @@ export type PipelineStageStat = {
   count: number;
 };
 
-type UserWithPref = User & { preference: UserPreference | null };
+export type MatchPipelineDimension = {
+  id: string;
+  title: string;
+  detail: string;
+};
+
+export type MatchPipelineInfoSource = {
+  id: string;
+  title: string;
+  detail: string;
+  count: number;
+};
+
+type UserWithPref = User & { preference: UserPreference | null; preferenceSignal?: UserPreferenceSignal | null };
+
+const MATCH_DIMENSIONS: MatchPipelineDimension[] = [
+  {
+    id: "profile_vector",
+    title: "资料向量相似度",
+    detail: "从简介、关键词、关系类型、共同活动和记忆文本生成 1024 维资料向量。",
+  },
+  {
+    id: "attachment",
+    title: "亲密关系安全感",
+    detail: "推断安全型、焦虑型、回避型倾向，判断相处稳定性与互补风险。",
+  },
+  {
+    id: "rhythm",
+    title: "沟通节奏",
+    detail: "比较低频、日常、高频互动偏好，节奏差异过大时直接降级。",
+  },
+  {
+    id: "emotion",
+    title: "情绪表达稳定度",
+    detail: "从表达内容识别情绪稳定、敏感、冲突处理等信号。",
+  },
+  {
+    id: "values",
+    title: "价值观优先级",
+    detail: "比较事业、家庭、自由、成长四类价值权重。",
+  },
+];
 
 function parseArray(raw?: string | null): string[] {
   if (!raw) return [];
@@ -22,6 +63,31 @@ function parseArray(raw?: string | null): string[] {
     // ignore
   }
   return [];
+}
+
+function jsonTags(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.map(String);
+  if (raw && typeof raw === "object" && "tags" in raw) {
+    const tags = (raw as { tags?: unknown }).tags;
+    if (Array.isArray(tags)) return tags.map(String);
+  }
+  return [];
+}
+
+function preferenceSignalBoost(signal: UserPreferenceSignal | null | undefined, candidate: UserWithPref): number {
+  if (!signal) return 0;
+  const liked = new Set(jsonTags(signal.likedTraitsJson).map((x) => x.toLowerCase()));
+  const unliked = new Set(jsonTags(signal.unlikedTraitsJson).map((x) => x.toLowerCase()));
+  const candidateTags = [
+    ...parseArray(candidate.preference?.matchTypes),
+    ...parseArray(candidate.preference?.activityTags),
+    ...parseArray(candidate.preference?.keywords),
+  ].map((x) => x.toLowerCase());
+  return candidateTags.reduce((score, tag) => {
+    if (liked.has(tag)) return score + 4;
+    if (unliked.has(tag)) return score - 5;
+    return score;
+  }, 0);
 }
 
 function normRegion(r?: string | null): string {
@@ -132,20 +198,24 @@ export type MatchPipelineResult = {
   stages: PipelineStageStat[];
   ranked: Ranked[];
   selfModel: UserModel;
+  dimensions: MatchPipelineDimension[];
+  infoSources: MatchPipelineInfoSource[];
 };
 
 /**
- * 从候选池扫描、统计各阶段人数，并产出向量兼容度排序结果（用于最终双向心动阈值判定）。
+ * 从候选池扫描、统计各阶段人数，并产出向量兼容度排序结果（用于挑出本次最合适的人）。
  */
 export async function runMatchPipeline(selfId: string, excludeIds: string[]): Promise<MatchPipelineResult> {
   const dbUser = await prisma.user.findUnique({
     where: { id: selfId },
-    include: { preference: true },
+    include: { preference: true, preferenceSignal: true },
   });
   if (!dbUser) {
     return {
       stages: [],
       ranked: [],
+      dimensions: MATCH_DIMENSIONS,
+      infoSources: [],
       selfModel: inferUserModel({
         userId: selfId,
         bio: null,
@@ -188,8 +258,10 @@ export async function runMatchPipeline(selfId: string, excludeIds: string[]): Pr
   const pool = await prisma.user.findMany({
     where: {
       id: { notIn: excludeIds },
+      // 游客一键试用号不参与「真实用户池」匹配
+      NOT: { authProvider: "guest" },
     },
-    include: { preference: true },
+    include: { preference: true, preferenceSignal: true },
     orderBy: { updatedAt: "desc" },
     take: MAX_SCAN,
   });
@@ -232,7 +304,12 @@ export async function runMatchPipeline(selfId: string, excludeIds: string[]): Pr
     rankedRaw.push({ candidate: candidate as UserWithPref, targetModel, scored });
   }
 
-  rankedRaw.sort((a, b) => b.scored.finalScore - a.scored.finalScore);
+  rankedRaw.sort(
+    (a, b) =>
+      b.scored.finalScore +
+      preferenceSignalBoost((dbUser as UserWithPref).preferenceSignal, b.candidate) -
+      (a.scored.finalScore + preferenceSignalBoost((dbUser as UserWithPref).preferenceSignal, a.candidate))
+  );
 
   const stages: PipelineStageStat[] = [
     {
@@ -244,7 +321,7 @@ export async function runMatchPipeline(selfId: string, excludeIds: string[]): Pr
     {
       id: "active",
       title: "有效账号",
-      detail: "已绑定登录方式、可参与匹配",
+      detail: "已绑定登录方式、可参与匹配（已排除游客试用号）",
       count: active.length,
     },
     {
@@ -262,10 +339,51 @@ export async function runMatchPipeline(selfId: string, excludeIds: string[]): Pr
     {
       id: "ranked",
       title: "排序就绪",
-      detail: "按综合分排序，等待心动阈值裁决",
+      detail: "按内部综合信号排序，准备挑出本次最合适的人",
       count: rankedRaw.length,
     },
   ];
 
-  return { stages, ranked: rankedRaw, selfModel };
+  const selfProfileFieldCount = [
+    dbUser.name,
+    dbUser.bio,
+    dbUser.gender,
+    dbUser.age,
+    dbUser.preference?.region,
+    dbUser.preference?.matchTypes,
+    dbUser.preference?.keywords,
+    dbUser.preference?.chatPace,
+    dbUser.preference?.meetPreference,
+    dbUser.preference?.emotionStyle,
+    dbUser.preference?.activityTags,
+  ].filter((x) => x != null && String(x).trim().length > 0).length;
+
+  const infoSources: MatchPipelineInfoSource[] = [
+    {
+      id: "self_profile",
+      title: "你的公开资料与心动设置",
+      detail: "昵称、简介、年龄/性别、地区、关系类型、关键词、节奏、线上线下、情绪风格、共同活动。",
+      count: selfProfileFieldCount,
+    },
+    {
+      id: "self_facts",
+      title: "你的长期信息库",
+      detail: "最近写入的 OwnerFact，用来补足兴趣、边界、价值观和生活偏好。",
+      count: selfFactsRows.length,
+    },
+    {
+      id: "self_messages",
+      title: "你的真人聊天样本",
+      detail: "最近的 user_self 消息，用来估算表达长度、回复节奏、话题深度。",
+      count: selfMsgRows.length,
+    },
+    {
+      id: "candidate_profiles",
+      title: "候选用户资料",
+      detail: "候选人的公开资料、心动设置、长期信息库与历史表达信号。",
+      count: pool.length,
+    },
+  ];
+
+  return { stages, ranked: rankedRaw, selfModel, dimensions: MATCH_DIMENSIONS, infoSources };
 }

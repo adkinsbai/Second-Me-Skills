@@ -1,30 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, getCurrentUserWithToken } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getOwnerInformationText } from "@/lib/ownerInformation";
-import {
-  extractStarterTopics,
-  getActionPlan,
-  getDateSuggestion,
-  getRelationshipProgress,
-  inferConsistencyPrediction,
-} from "@/lib/relationshipInsights";
+import { getActionPlan, getDateSuggestion, getRelationshipProgress } from "@/lib/relationshipInsights";
 
-const BASE_URL = process.env.SECONDME_API_BASE_URL;
-
-async function fetchShadesText(accessToken: string): Promise<string> {
-  if (!BASE_URL) return "";
-  try {
-    const res = await fetch(`${BASE_URL}/api/secondme/user/shades`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      cache: "no-store",
-    });
-    if (!res.ok) return "";
-    const data = await res.json();
-    return JSON.stringify(data?.data ?? data).slice(0, 500);
-  } catch {
-    return "";
-  }
+function extractMatchReason(report: Record<string, unknown> | null, summary: string) {
+  const reason = report?.matchReason;
+  return typeof reason === "string" && reason.trim() ? reason : summary;
 }
 
 export async function GET(
@@ -54,28 +35,11 @@ export async function GET(
       report = null;
     }
   }
-  const ownerInformationText = await getOwnerInformationText(user.id);
   const dbUser = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { bio: true, preference: { select: { meetPreference: true } } },
+    select: { preference: { select: { meetPreference: true } } },
   });
-  const tokenUser = await getCurrentUserWithToken();
-  const shadesText = tokenUser ? await fetchShadesText(tokenUser.accessToken) : "";
-  const agentMessages = match.messages.filter(
-    (m) => m.senderType === "agent_self" || m.senderType === "agent_target"
-  );
   const userChatCount = match.messages.filter((m) => m.senderType === "user_self").length;
-  const consistency = inferConsistencyPrediction({
-    messages: agentMessages.map((m) => ({ senderType: m.senderType, content: m.content })),
-    ownerFactsText: ownerInformationText,
-    selfBio: dbUser?.bio ?? "",
-    shadesText,
-    valuesScore: score.valuesScore,
-  });
-  const starterTopics = extractStarterTopics(
-    agentMessages.map((m) => ({ senderType: m.senderType, content: m.content })),
-    3
-  );
   const actionPlan = getActionPlan(score.totalScore);
   const progress = getRelationshipProgress(score.totalScore, userChatCount);
   const dateSuggestion = getDateSuggestion({
@@ -122,18 +86,21 @@ export async function GET(
       lifeStoryScore: score.lifeStoryScore,
       futureScore: score.futureScore,
       summary: score.summary,
+      matchReason: extractMatchReason(report, score.summary),
       report,
-      consistencyPrediction: consistency,
       expectationNote,
       riskNote,
-      starterTopics,
       actionPlan,
       relationshipProgress: progress,
       dateSuggestion,
       matchExplain,
       recommendationReasons,
       relationshipNotes: {
-        memories: agentMessages.slice(-3).map((m) => m.content).slice(0, 3),
+        memories: match.messages
+          .filter((m) => m.senderType === "user_self" || m.senderType === "user_target")
+          .slice(-3)
+          .map((m) => m.content)
+          .slice(0, 3),
         nextPlan: actionPlan[0] ?? "继续轻量了解",
       },
     },

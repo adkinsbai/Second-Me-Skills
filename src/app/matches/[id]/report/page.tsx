@@ -15,6 +15,7 @@ type ReportData = {
   lifeStoryScore?: number;
   futureScore?: number;
   summary?: string;
+  matchReason?: string;
   report: Record<string, unknown> | null;
   consistencyPrediction?: {
     score: number;
@@ -102,27 +103,19 @@ export default function ReportPage() {
   if (loading || !data) {
     return (
       <main className="page-shell app-container py-10">
-        <p className="luxury-subtitle text-sm">加载中…</p>
+        <p className="text-sm text-gray-500">加载中…</p>
       </main>
     );
   }
 
-  const hasScore = data.totalScore != null;
-  const scores = {
-    interestScore: data.interestScore ?? 0,
-    personalityScore: data.personalityScore ?? 0,
-    valuesScore: data.valuesScore ?? 0,
-    lifeStoryScore: data.lifeStoryScore ?? 0,
-    futureScore: data.futureScore ?? 0,
-  };
-
+  const hasReason = Boolean(data.matchReason || data.summary);
   const executiveBrief =
     data.report && typeof data.report.executiveBrief === "string" ? data.report.executiveBrief : null;
   const consistency = data.consistencyPrediction;
 
   return (
     <main className="page-shell">
-      <AppHeader backHref={`/matches/${id}`} title="多维度评分报告" />
+      <AppHeader backHref={`/matches/${id}`} title="丘比写给你们的话" />
       <div className="app-container max-w-2xl space-y-6 py-8">
         <div className="glass-card rounded-2xl p-6">
           <div className="flex items-center gap-4">
@@ -134,13 +127,10 @@ export default function ReportPage() {
               />
             )}
             <div>
-              <p className="font-medium text-amber-50">{data.targetUser.name ?? "对方"}</p>
-              {hasScore ? (
+              <p className="font-medium text-gray-900">{data.targetUser.name ?? "对方"}</p>
+              {hasReason ? (
                 <>
-                  <p className="bg-gradient-to-r from-amber-200 to-rose-200 bg-clip-text text-3xl font-semibold text-transparent">
-                    {data.totalScore} 分
-                  </p>
-                  <p className="mt-3 text-sm leading-relaxed text-amber-100/80">{data.summary}</p>
+                  <p className="mt-3 text-sm leading-relaxed text-gray-600">{data.matchReason ?? data.summary}</p>
                   {executiveBrief && (
                     <div className="luxury-alert luxury-alert-info mt-4 text-sm leading-relaxed">
                       <span className="font-medium">丘比总览 · </span>
@@ -149,21 +139,21 @@ export default function ReportPage() {
                   )}
                 </>
               ) : (
-                <p className="luxury-subtitle">暂无评分报告，匹配成功并写入分数后将在此展示</p>
+                <p className="luxury-subtitle">暂无匹配原因，匹配成功后将在此展示</p>
               )}
             </div>
           </div>
         </div>
 
-        {!hasScore && (
-          <p className="text-center text-sm text-amber-100/65">
-            <Link href={`/matches/${id}`} className="text-amber-200 underline underline-offset-2">
+        {!hasReason && (
+          <p className="text-center text-sm text-gray-500">
+            <Link href={`/matches/${id}`} className="text-[var(--brand-text)] underline underline-offset-2">
               返回匹配详情
             </Link>
           </p>
         )}
 
-        {hasScore && (
+        {hasReason && (
           <div className="space-y-5">
             {consistency && (
               <div
@@ -171,17 +161,14 @@ export default function ReportPage() {
                   consistency.score < 60
                     ? "border-red-400/35 bg-red-950/35 text-rose-50"
                     : consistency.score < 75
-                      ? "border-amber-400/35 bg-amber-950/25 text-amber-50"
+                      ? "border-amber-400/35 bg-amber-950/25 text-gray-900"
                       : "border-emerald-400/35 bg-emerald-950/30 text-emerald-50"
                 }`}
               >
                 <p className="text-sm font-semibold">
-                  真人一致性预测：{consistency.level}（{consistency.score}%）
+                  真人一致性预测：{consistency.level}
                 </p>
-                <p className="mt-1 text-sm text-amber-100/80">{consistency.hint}</p>
-                <p className="mt-2 text-xs text-amber-100/50">
-                  依据：信息重合度 {consistency.overlapRate}% · 矛盾点 {consistency.contradictions} 处
-                </p>
+                <p className="mt-1 text-sm text-gray-600">{consistency.hint}</p>
               </div>
             )}
 
@@ -189,13 +176,13 @@ export default function ReportPage() {
               <div className="grid gap-3 sm:grid-cols-2">
                 {data.expectationNote && (
                   <div className="glass-card rounded-2xl p-4">
-                    <p className="text-xs font-medium uppercase tracking-wide text-amber-100/45">预期管理</p>
-                    <p className="mt-1 text-sm leading-relaxed text-amber-100/80">{data.expectationNote}</p>
+                    <p className="text-xs font-medium uppercase tracking-wide text-gray-400">预期管理</p>
+                    <p className="mt-1 text-sm leading-relaxed text-gray-600">{data.expectationNote}</p>
                   </div>
                 )}
                 {data.riskNote && (
                   <div className="rounded-2xl border border-amber-400/35 bg-amber-950/25 p-4">
-                    <p className="text-xs font-medium uppercase tracking-wide text-amber-200/80">风险提示</p>
+                    <p className="text-xs font-medium uppercase tracking-wide text-[var(--brand-text)]/80">风险提示</p>
                     <p className="mt-1 text-sm leading-relaxed text-amber-50/95">{data.riskNote}</p>
                   </div>
                 )}
@@ -204,15 +191,9 @@ export default function ReportPage() {
 
             {data.matchExplain && (
               <div className="glass-card rounded-2xl border border-violet-400/25 p-4">
-                <p className="text-sm font-semibold text-violet-100">匹配度可解释面板</p>
-                <div className="mt-3 grid gap-2 text-sm text-violet-100/85 sm:grid-cols-2">
-                  <p>沟通节奏匹配度：{data.matchExplain.rhythm}%</p>
-                  <p>情绪互补度：{data.matchExplain.emotion}%</p>
-                  <p>价值观契合度：{data.matchExplain.values}%</p>
-                  <p>依恋类型兼容度：{data.matchExplain.attachment}%</p>
-                </div>
-                <p className="mt-2 text-xs text-violet-200/75">
-                  人格向量同频度：{Math.round(data.matchExplain.vectorSimilarity * 100)}%
+                <p className="text-sm font-semibold text-violet-100">丘比看见的火花</p>
+                <p className="mt-2 text-sm leading-6 text-violet-100/85">
+                  丘比不是把你们压成分数，而是在资料、城市、职业、兴趣和关系期待里寻找那些会让人心里一颤的重合。下面这些句子，是它从你们的生活线索里读到的火花。
                 </p>
                 {!!data.recommendationReasons?.length && (
                   <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-violet-100/90">
@@ -226,38 +207,30 @@ export default function ReportPage() {
 
             {DIMENSIONS.map(({ key, label, reportKey }) => {
               const dim = parseDimension(data.report?.[reportKey]);
-              const score = scores[key as keyof typeof scores];
               return (
                 <div key={key} className="glass-card rounded-2xl p-5">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="text-base font-semibold text-amber-50">{label}</span>
-                    <span className="text-lg font-semibold text-amber-200">{score} 分</span>
-                  </div>
-                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-black/40 ring-1 ring-amber-100/15">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-amber-400/90 to-rose-500/90 transition-all"
-                      style={{ width: `${score}%` }}
-                    />
+                    <span className="text-base font-semibold text-gray-900">{label}</span>
                   </div>
 
                   {dim && (
-                    <div className="mt-4 space-y-4 text-sm text-amber-100/80">
+                    <div className="mt-4 space-y-4 text-sm text-gray-600">
                       <div>
-                        <p className="text-xs font-medium uppercase tracking-wide text-amber-100/45">维度综述</p>
+                        <p className="text-xs font-medium uppercase tracking-wide text-gray-400">维度综述</p>
                         <p className="mt-1 leading-relaxed">{dim.summary}</p>
                       </div>
 
                       {dim.facets.length > 0 && (
                         <div>
-                          <p className="text-xs font-medium uppercase tracking-wide text-amber-100/45">细分观察</p>
+                          <p className="text-xs font-medium uppercase tracking-wide text-gray-400">细分观察</p>
                           <ul className="mt-2 grid gap-2 sm:grid-cols-2">
                             {dim.facets.map((f) => (
                               <li
                                 key={f.label}
-                                className="rounded-lg border border-amber-100/15 bg-black/30 px-3 py-2 leading-snug"
+                                className="rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 leading-snug"
                               >
-                                <span className="font-medium text-amber-50">{f.label}</span>
-                                <span className="text-amber-100/65"> — {f.observation}</span>
+                                <span className="font-medium text-gray-900">{f.label}</span>
+                                <span className="text-gray-500"> — {f.observation}</span>
                               </li>
                             ))}
                           </ul>
@@ -266,8 +239,8 @@ export default function ReportPage() {
 
                       {dim.bullets.length > 0 && (
                         <div>
-                          <p className="text-xs font-medium uppercase tracking-wide text-amber-100/45">对话证据与推论</p>
-                          <ul className="mt-2 list-inside list-disc space-y-1.5 text-amber-100/70">
+                          <p className="text-xs font-medium uppercase tracking-wide text-gray-400">对话证据与推论</p>
+                          <ul className="mt-2 list-inside list-disc space-y-1.5 text-gray-500">
                             {dim.bullets.map((b, i) => (
                               <li key={i} className="leading-relaxed">
                                 {b}
@@ -279,7 +252,7 @@ export default function ReportPage() {
 
                       {dim.caution ? (
                         <div className="rounded-lg border border-amber-400/35 bg-amber-950/30 px-3 py-2 text-amber-50/95">
-                          <span className="font-medium text-amber-200">风险提示 · </span>
+                          <span className="font-medium text-[var(--brand-text)]">风险提示 · </span>
                           {dim.caution}
                         </div>
                       ) : null}
@@ -298,7 +271,7 @@ export default function ReportPage() {
 
             {data.relationshipProgress && (
               <div className="glass-card rounded-2xl p-4">
-                <p className="text-sm font-semibold text-amber-50">关系进度条</p>
+                <p className="text-sm font-semibold text-gray-900">关系进度条</p>
                 <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1">
                   {data.relationshipProgress.steps.map((s, i) => {
                     const active = i <= data.relationshipProgress!.current;
@@ -307,7 +280,7 @@ export default function ReportPage() {
                         <span
                           className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ${
                             active
-                              ? "border border-amber-400/45 bg-amber-400/15 text-amber-50"
+                              ? "border border-amber-400/45 bg-amber-400/15 text-gray-900"
                               : "luxury-chip-muted"
                           }`}
                         >
@@ -354,11 +327,11 @@ export default function ReportPage() {
 
             {data.relationshipNotes && (
               <div className="glass-card rounded-2xl p-4">
-                <p className="text-sm font-semibold text-amber-50">关系沉淀</p>
+                <p className="text-sm font-semibold text-gray-900">关系沉淀</p>
                 {!!data.relationshipNotes.memories?.length && (
                   <div className="mt-2">
-                    <p className="text-xs uppercase tracking-wide text-amber-100/45">重要对话片段</p>
-                    <ul className="mt-1 list-inside list-disc space-y-1 text-sm text-amber-100/75">
+                    <p className="text-xs uppercase tracking-wide text-gray-400">重要对话片段</p>
+                    <ul className="mt-1 list-inside list-disc space-y-1 text-sm text-gray-600">
                       {data.relationshipNotes.memories.slice(0, 3).map((m, i) => (
                         <li key={i}>{m}</li>
                       ))}
@@ -366,8 +339,8 @@ export default function ReportPage() {
                   </div>
                 )}
                 {data.relationshipNotes.nextPlan && (
-                  <p className="mt-2 text-sm text-amber-100/80">
-                    <span className="font-medium text-amber-50">下一步计划：</span>
+                  <p className="mt-2 text-sm text-gray-600">
+                    <span className="font-medium text-gray-900">下一步计划：</span>
                     {data.relationshipNotes.nextPlan}
                   </p>
                 )}

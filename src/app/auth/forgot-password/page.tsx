@@ -44,9 +44,9 @@ export default function ForgotPasswordPage() {
   return (
     <main className="page-shell px-4 py-12">
       <div className="glass-card mx-auto w-full max-w-md space-y-4 rounded-2xl p-6">
-        <p className="text-xs uppercase tracking-[0.25em] text-amber-100/55">Account Recovery</p>
+        <p className="text-xs uppercase tracking-[0.25em] text-gray-400">Account Recovery</p>
         <h1 className="luxury-title text-2xl font-semibold">找回密码</h1>
-        <p className="text-sm text-amber-100/70">输入注册邮箱，我们会发送重置链接。</p>
+        <p className="text-sm text-gray-500">输入注册邮箱，我们会发送重置链接。</p>
 
         <input
           type="email"
@@ -58,7 +58,7 @@ export default function ForgotPasswordPage() {
         {error ? <p className="text-xs text-rose-300">{error}</p> : null}
         {message ? <p className="text-xs text-emerald-300">{message}</p> : null}
         {debugLink ? (
-          <Link href={debugLink} className="block text-xs text-amber-200 underline underline-offset-2">
+          <Link href={debugLink} className="block text-xs text-[var(--brand-text)] underline underline-offset-2">
             开发模式：点击这里直接重置密码
           </Link>
         ) : null}
@@ -72,7 +72,7 @@ export default function ForgotPasswordPage() {
           {loading ? "提交中…" : "发送找回链接"}
         </button>
 
-        <Link href="/auth" className="inline-block text-xs text-amber-100/70 underline underline-offset-2">
+        <Link href="/auth" className="inline-block text-xs text-gray-500 underline underline-offset-2">
           返回登录
         </Link>
       </div>

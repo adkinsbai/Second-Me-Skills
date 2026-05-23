@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { TownScaffold } from "@/components/TownScaffold";
+import { TownPostEngagement } from "@/components/TownPostEngagement";
+import { EmojiMartPopover } from "@/components/EmojiMartPopover";
 
 type Author = { id: string; name: string | null; avatarUrl: string | null };
 type TownPost = {
@@ -15,6 +17,9 @@ type TownPost = {
   categories: string[];
   createdAt: string;
   author: Author;
+  likeCount: number;
+  commentCount: number;
+  likedByMe: boolean;
 };
 
 type Candidate = {
@@ -75,8 +80,15 @@ export default function TownMyNeedsPage() {
   const refreshPosts = async () => {
     const r = await fetch("/api/town/posts?mine=1", { credentials: "include" });
     const d = await r.json().catch(() => null);
-    const list = d?.data?.posts ?? [];
-    setPosts(list as TownPost[]);
+    const list = (d?.data?.posts ?? []) as Record<string, unknown>[];
+    setPosts(
+      list.map((p) => ({
+        ...(p as unknown as TownPost),
+        likeCount: Number(p.likeCount ?? 0),
+        commentCount: Number(p.commentCount ?? 0),
+        likedByMe: !!p.likedByMe,
+      }))
+    );
   };
 
   useEffect(() => {
@@ -175,7 +187,7 @@ export default function TownMyNeedsPage() {
         <div className="town-on-light">
           <AppHeader backHref="/town" title="发布" />
           <div className="app-container py-12">
-            <p className="luxury-subtitle text-sm">加载中…</p>
+            <p className="text-sm text-gray-500">加载中…</p>
           </div>
         </div>
       </TownScaffold>
@@ -232,16 +244,16 @@ export default function TownMyNeedsPage() {
           <section className="space-y-4">
             {posts.length === 0 ? (
               <div className="glass-card rounded-3xl p-8 text-center">
-                <p className="luxury-subtitle text-sm">你还没有发布需求</p>
-                <p className="mt-2 text-sm text-amber-100/70">先发布一条，AI 会自动分类并生成 10 个候选</p>
+                <p className="text-sm text-gray-500">你还没有发布需求</p>
+                <p className="mt-2 text-sm text-gray-500">先发布一条，AI 会自动分类并生成 10 个候选</p>
               </div>
             ) : (
               posts.map((p) => (
                 <article key={p.id} className="glass-card rounded-3xl p-5">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
-                      <h2 className="truncate text-base font-semibold text-amber-50">{p.title}</h2>
-                      <p className="mt-1 text-sm text-amber-100/70 whitespace-pre-wrap">{p.content}</p>
+                      <h2 className="truncate text-base font-semibold text-gray-900">{p.title}</h2>
+                      <p className="mt-1 text-sm text-gray-500 whitespace-pre-wrap">{p.content}</p>
                       <div className="mt-3 flex flex-wrap gap-2">
                         {p.categories.map((c) => (
                           <span key={c} className="luxury-chip text-[11px]">
@@ -261,7 +273,14 @@ export default function TownMyNeedsPage() {
                       </button>
                     </div>
                   </div>
-                  <div className="mt-3 text-xs text-amber-100/45">发布于 {new Date(p.createdAt).toLocaleString()}</div>
+                  <div className="mt-3 text-xs text-gray-400">发布于 {new Date(p.createdAt).toLocaleString()}</div>
+                  <TownPostEngagement
+                    postId={p.id}
+                    likeCount={p.likeCount}
+                    commentCount={p.commentCount}
+                    likedByMe={p.likedByMe}
+                    emojiTheme="dark"
+                  />
                 </article>
               ))
             )}
@@ -271,12 +290,12 @@ export default function TownMyNeedsPage() {
 
       {/* 候选弹窗 */}
         {matchPostId ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 p-4 backdrop-blur-sm">
             <div className="w-full max-w-3xl rounded-3xl bg-[#0c111b]/90 p-5 shadow-2xl">
               <div className="flex items-center justify-between gap-4 mb-4">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.32em] text-amber-100/60">Candidates</p>
-                  <h3 className="mt-2 text-lg font-semibold text-amber-50">10 位候选人</h3>
+                  <p className="text-xs uppercase tracking-[0.32em] text-gray-400">Candidates</p>
+                  <h3 className="mt-2 text-lg font-semibold text-gray-900">10 位候选人</h3>
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -302,9 +321,9 @@ export default function TownMyNeedsPage() {
 
               <div className="max-h-[60vh] overflow-y-auto">
                 {candidateLoading ? (
-                  <p className="luxury-subtitle text-sm">正在生成候选…</p>
+                  <p className="text-sm text-gray-500">正在生成候选…</p>
                 ) : candidates.length === 0 ? (
-                  <p className="luxury-subtitle text-sm">没有候选（请换一批）</p>
+                  <p className="text-sm text-gray-500">没有候选（请换一批）</p>
                 ) : (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {candidates.map((c) => (
@@ -312,28 +331,28 @@ export default function TownMyNeedsPage() {
                         key={c.id}
                         type="button"
                         onClick={() => openOpener(matchPostId, c)}
-                        className="text-left rounded-2xl border border-amber-200/20 bg-black/25 p-4 transition hover:border-amber-200/35"
+                        className="text-left rounded-2xl border border-gray-200 bg-gray-50 p-4 transition hover:border-gray-200"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="h-14 w-14 overflow-hidden rounded-full border border-amber-200/20 bg-black/30">
+                          <div className="h-14 w-14 overflow-hidden rounded-full border border-gray-200 bg-gray-100">
                             {c.avatarUrl ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={c.avatarUrl} alt="" className="h-full w-full object-cover" />
                             ) : (
-                              <div className="flex h-full w-full items-center justify-center text-sm text-amber-100/60">
+                              <div className="flex h-full w-full items-center justify-center text-sm text-gray-400">
                                 {(c.name?.[0] ?? "?").toString()}
                               </div>
                             )}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="truncate font-medium text-amber-50">{c.name ?? "未设置昵称"}</p>
-                            <p className="mt-1 text-xs text-amber-100/55 truncate">{c.bio ?? ""}</p>
+                            <p className="truncate font-medium text-gray-900">{c.name ?? "未设置昵称"}</p>
+                            <p className="mt-1 text-xs text-gray-400 truncate">{c.bio ?? ""}</p>
                           </div>
-                          <div className="shrink-0 rounded-full border border-amber-200/20 bg-amber-200/10 px-2 py-1 text-[11px] text-amber-200/90">
+                          <div className="shrink-0 rounded-full border border-gray-200 bg-amber-200/10 px-2 py-1 text-[11px] text-[var(--brand-text)]/90">
                             {c.totalScore}
                           </div>
                         </div>
-                        <div className="mt-3 text-xs text-amber-100/45">点击选择并发送开场信息</div>
+                        <div className="mt-3 text-xs text-gray-400">点击选择并发送开场信息</div>
                       </button>
                     ))}
                   </div>
@@ -345,19 +364,27 @@ export default function TownMyNeedsPage() {
 
         {/* 开场信息弹窗 */}
         {openerOpen && openerPostId && openerCandidateId ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 p-4 backdrop-blur-sm">
             <div className="w-full max-w-2xl rounded-3xl bg-[#0c111b]/90 p-5 shadow-2xl">
               <div className="mb-4">
-                <p className="text-xs uppercase tracking-[0.32em] text-amber-100/60">Opener</p>
-                <h3 className="mt-2 text-lg font-semibold text-amber-50">
+                <p className="text-xs uppercase tracking-[0.32em] text-gray-400">Opener</p>
+                <h3 className="mt-2 text-lg font-semibold text-gray-900">
                   给 {openerCandidateName ?? "对方"} 的开场信息
                 </h3>
               </div>
               <textarea
                 value={openerText}
                 onChange={(e) => setOpenerText(e.target.value)}
+                maxLength={800}
                 className="luxury-input min-h-[140px] w-full rounded-3xl px-4 py-3 text-sm"
               />
+              <div className="mt-2 flex justify-end">
+                <EmojiMartPopover
+                  theme="dark"
+                  label="表情"
+                  onEmojiSelect={(s) => setOpenerText((t) => (t + s).slice(0, 800))}
+                />
+              </div>
               <div className="mt-4 flex gap-3">
                 <button
                   type="button"
@@ -376,7 +403,7 @@ export default function TownMyNeedsPage() {
                   {startingChat ? "发送中…" : "发送并开始对话"}
                 </button>
               </div>
-              <p className="mt-3 text-xs text-amber-100/45">
+              <p className="mt-3 text-xs text-gray-400">
                 你的开场信息会发送到对方的小镇「消息中心」，对方不会在原来的聊天栏收到。
               </p>
             </div>

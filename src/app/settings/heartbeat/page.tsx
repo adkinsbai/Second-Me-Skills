@@ -107,11 +107,11 @@ function AgeRangeSection({ ageMin, ageMax, onChange }: AgeRangeSectionProps) {
 
   return (
     <section className="glass-card rounded-2xl p-4">
-      <h2 className="mb-3 font-medium text-amber-50">年龄范围</h2>
-      <p className="mb-2 text-xs text-amber-100/50">
+      <h2 className="mb-3 font-medium text-gray-900">年龄范围</h2>
+      <p className="mb-2 text-xs text-gray-400">
         一条线两个圆点，左边是最小年龄，右边是最大年龄。
       </p>
-      <div className="mb-2 flex items-center justify-between text-sm text-amber-100/80">
+      <div className="mb-2 flex items-center justify-between text-sm text-gray-600">
         <span>
           {effectiveMin} 岁 ～ {effectiveMax} 岁
         </span>
@@ -120,7 +120,7 @@ function AgeRangeSection({ ageMin, ageMax, onChange }: AgeRangeSectionProps) {
         ref={trackRef}
         className="relative mt-3 h-8 select-none"
       >
-        <div className="absolute left-0 right-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-black/40 ring-1 ring-amber-100/15" />
+        <div className="absolute left-0 right-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-black/40 ring-1 ring-gray-200" />
         <div
           className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-gradient-to-r from-amber-400/90 to-rose-500/80"
           style={{
@@ -159,8 +159,6 @@ function AgeRangeSection({ ageMin, ageMax, onChange }: AgeRangeSectionProps) {
 
 export default function HeartbeatSettingsPage() {
   const router = useRouter();
-  const [threshold, setThreshold] = useState(80);
-  const [thresholdMode, setThresholdMode] = useState<"conservative" | "balanced" | "open">("balanced");
   const [dailyMatchTime, setDailyMatchTime] = useState("21:00");
   const [expectedGender, setExpectedGender] =
     useState<"male" | "female" | "any">("any");
@@ -190,8 +188,6 @@ export default function HeartbeatSettingsPage() {
       .then((d) => {
         if (d.code === 0 && d.data) {
           const data = d.data;
-          setThreshold(data.heartThreshold ?? 80);
-          setThresholdMode(data.thresholdMode ?? "balanced");
           setDailyMatchTime(data.dailyMatchTime ?? "21:00");
           setExpectedGender(data.expectedGender ?? "any");
           setAgeMin(data.ageMin != null ? data.ageMin : "");
@@ -259,8 +255,6 @@ export default function HeartbeatSettingsPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        heartThreshold: threshold,
-        thresholdMode,
         dailyMatchTime,
         dailyMatchTimezone: "Asia/Shanghai",
         expectedGender,
@@ -291,7 +285,7 @@ export default function HeartbeatSettingsPage() {
   if (!loaded) {
     return (
       <main className="page-shell app-container py-10">
-        <p className="luxury-subtitle text-sm">加载中…</p>
+        <p className="text-sm text-gray-500">加载中…</p>
       </main>
     );
   }
@@ -302,61 +296,17 @@ export default function HeartbeatSettingsPage() {
     <main className="page-shell pb-24">
       <AppHeader backHref="/" title="心动设置" />
       <div className="app-container max-w-2xl space-y-6 py-8">
-        {/* 心动阈值 */}
-        <section>
-          <h2 className="mb-2 font-medium text-amber-50">心动阈值</h2>
-          <p className="mb-3 text-sm text-amber-100/70">
-            不用再手动调数字，选择你更偏好的匹配风格即可。
+        <div className="poster-panel p-5">
+          <p className="poster-kicker">Preference Poster</p>
+          <h1 className="mt-4 text-4xl font-black leading-10 text-[var(--brand)]">把“合拍”说清楚</h1>
+          <p className="mt-3 text-sm font-bold leading-6 text-[var(--paper)]">
+            用关系类型、相处节奏和共同活动告诉丘比你想遇见怎样的人。这里不再强调阈值，只强调真实偏好。
           </p>
-          <div className="glass-card rounded-2xl p-6">
-            <div className="grid gap-3">
-              {[
-                {
-                  key: "conservative",
-                  label: "保守型（宁缺毋滥）",
-                  threshold: 85,
-                  desc: "只有高度契合、三观高度一致才会推荐，可能几天才出现 1 个。",
-                },
-                {
-                  key: "balanced",
-                  label: "标准型（平衡匹配）",
-                  threshold: 70,
-                  desc: "适合大概率聊得来的人，每天 1~3 个推荐。",
-                },
-                {
-                  key: "open",
-                  label: "开放型（多认识朋友）",
-                  threshold: 55,
-                  desc: "扩大社交圈，适合想多认识新朋友的人。",
-                },
-              ].map((opt) => (
-                <button
-                  key={opt.key}
-                  type="button"
-                  onClick={() => {
-                    setThresholdMode(opt.key as "conservative" | "balanced" | "open");
-                    setThreshold(opt.threshold);
-                  }}
-                  className={`rounded-xl border px-4 py-3 text-left transition ${
-                    thresholdMode === opt.key ? "luxury-option-active" : "luxury-option"
-                  }`}
-                >
-                  <p className="text-sm font-semibold">{opt.label}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-amber-100/65">{opt.desc}</p>
-                  <p className="mt-1 text-[11px] text-amber-100/45">后台阈值映射：≥ {opt.threshold} 分</p>
-                </button>
-              ))}
-            </div>
-            <p className="mt-3 text-xs text-amber-100/50">
-              系统会结合解锁率与真人聊天长度做轻微动态调节，你无需理解复杂分值。
-            </p>
-          </div>
-        </section>
-
+        </div>
         <section className="glass-card rounded-2xl p-4">
-          <h2 className="mb-2 font-medium text-amber-50">每日匹配时间</h2>
-          <p className="mb-3 text-sm text-amber-100/70">
-            你设定一个时间点，丘比会在这个时刻开始为你分批准备当天的人选。当前上线阶段每天最多 6 位，兼顾效率和质量。
+          <h2 className="mb-2 font-medium text-gray-900">每日匹配时间</h2>
+          <p className="mb-3 text-sm text-gray-500">
+            你设定一个时间点，丘比会在这个时刻提醒你开始匹配。当前每天最多 3 次机会，每次只给当前最合适的 1 位。
           </p>
           <div className="flex items-center gap-3">
             <input
@@ -365,7 +315,7 @@ export default function HeartbeatSettingsPage() {
               onChange={(e) => setDailyMatchTime(e.target.value || "21:00")}
               className="luxury-input rounded-xl px-3 py-2 text-sm"
             />
-            <span className="text-xs text-amber-100/50">时区：北京时间（UTC+8）</span>
+            <span className="text-xs text-gray-400">时区：北京时间（UTC+8）</span>
           </div>
           <p className="mt-2 text-xs text-rose-200/85">
             温柔提醒：不是没人配你呀，而是丘比想把“更对的人”留给你，慢一点，反而更甜。
@@ -374,8 +324,8 @@ export default function HeartbeatSettingsPage() {
 
         {/* 期望找到谁 */}
         <section className="glass-card rounded-2xl p-4">
-          <h2 className="mb-3 font-medium text-amber-50">期望找到谁</h2>
-          <div className="flex gap-4 text-amber-100/85">
+          <h2 className="mb-3 font-medium text-gray-900">期望找到谁</h2>
+          <div className="flex gap-4 text-gray-700">
             {(["any", "male", "female"] as const).map((v) => (
               <label key={v} className="flex cursor-pointer items-center gap-2">
                 <input
@@ -403,7 +353,7 @@ export default function HeartbeatSettingsPage() {
 
         {/* 地区 */}
         <section className="glass-card rounded-2xl p-4">
-          <h2 className="mb-3 font-medium text-amber-50">地区</h2>
+          <h2 className="mb-3 font-medium text-gray-900">地区</h2>
           <input
             type="text"
             placeholder="如：北京、上海、线上"
@@ -415,7 +365,7 @@ export default function HeartbeatSettingsPage() {
 
         {/* 相处节奏偏好 */}
         <section className="glass-card rounded-2xl p-4">
-          <h2 className="mb-3 font-medium text-amber-50">相处节奏偏好</h2>
+          <h2 className="mb-3 font-medium text-gray-900">相处节奏偏好</h2>
           <div className="flex flex-col gap-2 text-sm">
             {[
               { key: "low", label: "低频但稳定", desc: "想聊时聊，不刷存在感" },
@@ -431,7 +381,7 @@ export default function HeartbeatSettingsPage() {
                 }`}
               >
                 <span className="font-medium">{opt.label}</span>
-                <span className="ml-2 text-xs text-amber-100/50">{opt.desc}</span>
+                <span className="ml-2 text-xs text-gray-400">{opt.desc}</span>
               </button>
             ))}
           </div>
@@ -439,7 +389,7 @@ export default function HeartbeatSettingsPage() {
 
         {/* 线上 / 线下偏好 */}
         <section className="glass-card rounded-2xl p-4">
-          <h2 className="mb-3 font-medium text-amber-50">线上 / 线下偏好</h2>
+          <h2 className="mb-3 font-medium text-gray-900">线上 / 线下偏好</h2>
           <div className="flex flex-col gap-2 text-sm">
             {[
               { key: "online", label: "纯线上就好", desc: "更享受线上聊得来的感觉" },
@@ -457,7 +407,7 @@ export default function HeartbeatSettingsPage() {
                 }`}
               >
                 <span className="font-medium">{opt.label}</span>
-                <span className="ml-2 text-xs text-amber-100/50">{opt.desc}</span>
+                <span className="ml-2 text-xs text-gray-400">{opt.desc}</span>
               </button>
             ))}
           </div>
@@ -465,7 +415,7 @@ export default function HeartbeatSettingsPage() {
 
         {/* 情绪表达风格 */}
         <section className="glass-card rounded-2xl p-4">
-          <h2 className="mb-3 font-medium text-amber-50">情绪表达风格</h2>
+          <h2 className="mb-3 font-medium text-gray-900">情绪表达风格</h2>
           <div className="flex flex-col gap-2 text-sm">
             {[
               { key: "direct", label: "直接表达派", desc: "有想法会说出来，希望对方也是" },
@@ -487,7 +437,7 @@ export default function HeartbeatSettingsPage() {
                 }`}
               >
                 <span className="font-medium">{opt.label}</span>
-                <span className="ml-2 text-xs text-amber-100/50">{opt.desc}</span>
+                <span className="ml-2 text-xs text-gray-400">{opt.desc}</span>
               </button>
             ))}
           </div>
@@ -495,8 +445,8 @@ export default function HeartbeatSettingsPage() {
 
         {/* 期望关系类型 */}
         <section className="glass-card rounded-2xl p-4">
-          <h2 className="mb-1 font-medium text-amber-50">期望关系类型</h2>
-          <p className="mb-3 text-xs text-amber-100/50">
+          <h2 className="mb-1 font-medium text-gray-900">期望关系类型</h2>
+          <p className="mb-3 text-xs text-gray-400">
             可以随便写，比如「灵魂伴侣」「深夜吃粉搭子」「一起摆烂搭子」，回车生成标签。
           </p>
           <div className="mb-2 flex flex-wrap gap-2">
@@ -506,7 +456,7 @@ export default function HeartbeatSettingsPage() {
                 <button
                   type="button"
                   onClick={() => removeType(t)}
-                  className="ml-1 text-amber-200/80 hover:text-amber-50"
+                  className="ml-1 text-[var(--brand-text)]/80 hover:text-gray-900"
                   aria-label={`移除 ${t}`}
                 >
                   ×
@@ -514,7 +464,7 @@ export default function HeartbeatSettingsPage() {
               </span>
             ))}
             {matchTypes.length === 0 && (
-              <span className="text-xs text-amber-100/40">
+              <span className="text-xs text-gray-300">
                 暂时还没有标签，下面输入一条试试
               </span>
             )}
@@ -542,7 +492,7 @@ export default function HeartbeatSettingsPage() {
             </button>
           </div>
           <div className="mt-3">
-            <p className="mb-1 text-xs text-amber-100/50">
+            <p className="mb-1 text-xs text-gray-400">
               不知道怎么写？可以点点这些灵感：
             </p>
             <div className="flex flex-wrap gap-2">
@@ -551,25 +501,25 @@ export default function HeartbeatSettingsPage() {
                   key={t}
                   type="button"
                   onClick={() => addSuggestion(t)}
-                  className="luxury-chip-muted rounded-full px-3 py-1 text-xs transition hover:border-amber-200/35 hover:text-amber-100/85"
+                  className="luxury-chip-muted rounded-full px-3 py-1 text-xs transition hover:border-gray-200 hover:text-gray-700"
                 >
                   {t}
                 </button>
               ))}
             </div>
           </div>
-          <p className="mt-3 text-xs text-amber-100/50">
+          <p className="mt-3 text-xs text-gray-400">
             AI 根据类型生成匹配关键词：
           </p>
-          <p className="mt-1 rounded-xl border border-amber-200/25 bg-black/30 px-3 py-2 text-sm text-amber-100/85">
+          <p className="mt-1 rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-700">
             {keywords}
           </p>
         </section>
 
         {/* 共同行动偏好 */}
         <section className="glass-card rounded-2xl p-4">
-          <h2 className="mb-1 font-medium text-amber-50">共同行动偏好</h2>
-          <p className="mb-3 text-xs text-amber-100/50">
+          <h2 className="mb-1 font-medium text-gray-900">共同行动偏好</h2>
+          <p className="mb-3 text-xs text-gray-400">
             想和对方一起做些什么？可以自由写，比如「一起打 ARPG」「周末骑车」「一起开黑」。
           </p>
           <div className="mb-2 flex flex-wrap gap-2">
@@ -590,7 +540,7 @@ export default function HeartbeatSettingsPage() {
               </span>
             ))}
             {activityTags.length === 0 && (
-              <span className="text-xs text-amber-100/40">
+              <span className="text-xs text-gray-300">
                 还没有共同活动标签，可以下面随便写几个
               </span>
             )}
@@ -649,7 +599,7 @@ export default function HeartbeatSettingsPage() {
             >
               丘比小镇 →
             </Link>
-            <p className="mt-2 text-xs text-amber-100/55">发帖、广场探索、候选人消息（路径：/town）</p>
+            <p className="mt-2 text-xs text-gray-400">发帖、广场探索、候选人消息（路径：/town）</p>
           </div>
         </div>
       </div>

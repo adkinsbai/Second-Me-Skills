@@ -2,29 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
-type ThresholdMode = "conservative" | "balanced" | "open";
-
-function mapModeToThreshold(mode: ThresholdMode): number {
-  if (mode === "conservative") return 85;
-  if (mode === "open") return 55;
-  return 70;
-}
-
-function mapThresholdToMode(threshold: number): ThresholdMode {
-  if (threshold >= 80) return "conservative";
-  if (threshold <= 60) return "open";
-  return "balanced";
-}
-
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ code: 401 }, { status: 401 });
   const prefs = await prisma.userPreference.findUnique({
     where: { userId: user.id },
   });
-  const threshold = prefs?.heartThreshold ?? 80;
-  const thresholdMode = mapThresholdToMode(threshold);
-
   let matchTypes: string[] = [];
   if (prefs?.matchTypes) {
     try {
@@ -42,8 +25,6 @@ export async function GET() {
   return NextResponse.json({
     code: 0,
     data: {
-      heartThreshold: threshold,
-      thresholdMode,
       dailyMatchTime: prefs?.dailyMatchTime ?? "21:00",
       dailyMatchTimezone: prefs?.dailyMatchTimezone ?? "Asia/Shanghai",
       expectedGender: prefs?.expectedGender ?? "any",
@@ -65,11 +46,6 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ code: 401 }, { status: 401 });
   const body = await request.json();
 
-  const reqMode = body.thresholdMode as ThresholdMode | undefined;
-  const heartThreshold =
-    reqMode && ["conservative", "balanced", "open"].includes(reqMode)
-      ? mapModeToThreshold(reqMode)
-      : Math.min(100, Math.max(0, Number(body.heartThreshold) ?? 80));
   const expectedGender = ["male", "female", "any"].includes(body.expectedGender)
     ? body.expectedGender
     : undefined;
@@ -113,7 +89,6 @@ export async function POST(request: NextRequest) {
     where: { userId: user.id },
     create: {
       userId: user.id,
-      heartThreshold,
       dailyMatchTime: dailyMatchTime ?? "21:00",
       dailyMatchTimezone: dailyMatchTimezone ?? "Asia/Shanghai",
       expectedGender: expectedGender ?? undefined,
@@ -128,7 +103,6 @@ export async function POST(request: NextRequest) {
       activityTags: activityTagsStr ?? undefined,
     },
     update: {
-      heartThreshold,
       ...(dailyMatchTime !== undefined && { dailyMatchTime }),
       ...(dailyMatchTimezone !== undefined && { dailyMatchTimezone }),
       ...(expectedGender !== undefined && { expectedGender }),
@@ -147,7 +121,6 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     code: 0,
     data: {
-      heartThreshold,
       dailyMatchTime: dailyMatchTime ?? "21:00",
       dailyMatchTimezone: dailyMatchTimezone ?? "Asia/Shanghai",
       expectedGender: expectedGender ?? null,

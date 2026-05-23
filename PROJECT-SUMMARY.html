@@ -214,13 +214,13 @@
       <h2>已实现的核心功能（概览）</h2>
       <ul>
         <li><strong>账号与登录</strong>：SecondMe OAuth2、本地邮箱密码（bcrypt）、访客、忘记/重置密码。</li>
-        <li><strong>资料与心动设置</strong>：昵称/头像/简介/性别/年龄、期望对象、地区、匹配类型、聊天节奏、心动阈值等（<code>UserPreference</code>）。</li>
-        <li><strong>匹配流水线</strong>：多阶段筛选（池扫描 → 有效账号 → 双向心动条件 → 向量/合拍 → 双向阈值），<code>/api/matches/seed</code> 返回阶段统计；首页/匹配开始页可展示进度与动画。</li>
-        <li><strong>匹配列表与详情</strong>：历史匹配、综合分、入口至聊天/报告/关系页；解锁后与对方对称的匹配记录。</li>
+        <li><strong>资料与心动设置</strong>：昵称/头像/简介/性别/年龄、期望对象、地区、匹配类型、聊天节奏等（<code>UserPreference</code>）。</li>
+        <li><strong>匹配流水线</strong>：多阶段筛选（池扫描 → 有效账号 → 双向心动条件 → 向量/合拍 → 本次最优人选），<code>/api/matches/seed</code> 返回阶段统计；首页/匹配开始页可展示进度与动画。</li>
+        <li><strong>匹配列表与详情</strong>：历史匹配、故事化匹配开场、入口至真人聊天/报告/关系页；匹配后与对方对称的匹配记录。</li>
         <li><strong>真人聊天</strong>：REST 收发消息、<strong>SSE</strong> 推送新消息、乐观发送、已读（<code>MatchRead</code>）、分页加载更早消息、图片 DataURL、微信风格气泡 UI。</li>
-        <li><strong>评分报告 / 关系洞察</strong>：多维度分数与说明文案（与 <code>MatchScore</code>、demo 报告数据结合）。</li>
+        <li><strong>丘比旁白 / 关系洞察</strong>：从城市、职业、兴趣、关系期待等真实线索生成文艺心动文案（与 <code>MatchScore</code>、demo 报告数据结合）。</li>
         <li><strong>丘比小镇</strong>：发帖、探索、我的需求、会话列表、小镇内双人聊天与已读。</li>
-        <li><strong>数字体相关（SecondMe）</strong>：首页/Owner 侧流式聊天、Act 流式接口等；<strong>双方 Agent 初识对话</strong>相关代码保留，产品入口可按版本关闭或隐藏。</li>
+        <li><strong>数字体相关（SecondMe）</strong>：首页/Owner 侧流式聊天、Act 流式接口等。</li>
         <li><strong>其他页面</strong>：隐私政策、自我介绍测验、Onboarding 变体等。</li>
       </ul>
     </section>
@@ -335,10 +335,6 @@
             <td>关系洞察：基于匹配的延伸分析展示。</td>
           </tr>
           <tr>
-            <td><code>/matches/[id]/agent-chat</code></td>
-            <td>双方 Agent 初识对话（代码保留；产品策略上可隐藏入口）。</td>
-          </tr>
-          <tr>
             <td><code>/users/[id]</code></td>
             <td>用户公开主页：查看他人资料与标签。</td>
           </tr>
@@ -412,11 +408,6 @@
           <h4>报告与关系</h4>
           <div class="route">/matches/[id]/report · /matches/[id]/relationship</div>
           <p>结构化呈现匹配解释与关系向洞察，辅助用户决策是否深聊。</p>
-        </div>
-        <div class="card">
-          <h4>Agent 双聊（可选）</h4>
-          <div class="route">/matches/[id]/agent-chat</div>
-          <p>基于 SecondMe 流式接口的双方 Agent 对话；业务上可与「真实匹配」策略解耦。</p>
         </div>
         <div class="card">
           <h4>用户主页</h4>

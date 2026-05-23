@@ -404,7 +404,7 @@ export default function HumanChatPage() {
               type="button"
               onClick={loadMore}
               disabled={loadingMore}
-              className="rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs text-amber-100/60 backdrop-blur transition hover:border-white/25 hover:text-amber-50 disabled:opacity-40"
+              className="rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs text-gray-400 backdrop-blur transition hover:border-white/25 hover:text-gray-900 disabled:opacity-40"
             >
               {loadingMore ? "加载中…" : "查看更早的消息"}
             </button>
@@ -413,7 +413,7 @@ export default function HumanChatPage() {
 
         {messages.length === 0 ? (
           <div className="flex h-full items-center justify-center">
-            <p className="text-sm text-amber-100/40">
+            <p className="text-sm text-gray-300">
               还没有消息，发一句打个招呼吧 👋
             </p>
           </div>
@@ -459,11 +459,11 @@ export default function HumanChatPage() {
               alt="预览"
               className="h-14 w-14 rounded-xl object-cover shadow"
             />
-            <div className="flex-1 text-xs text-amber-100/60">已选图片</div>
+            <div className="flex-1 text-xs text-gray-400">已选图片</div>
             <button
               type="button"
               onClick={() => setSelectedImageDataUrl(null)}
-              className="rounded-lg border border-white/15 px-3 py-1 text-xs text-amber-100/70 transition hover:border-white/30"
+              className="rounded-lg border border-white/15 px-3 py-1 text-xs text-gray-500 transition hover:border-white/30"
             >
               移除
             </button>
@@ -501,7 +501,7 @@ export default function HumanChatPage() {
             className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xl transition ${
               showEmoji
                 ? "bg-amber-400/20 text-amber-300"
-                : "text-amber-100/50 hover:text-amber-100/80"
+                : "text-gray-400 hover:text-gray-600"
             }`}
           >
             😊
@@ -515,12 +515,12 @@ export default function HumanChatPage() {
             onKeyDown={onKeyDown}
             placeholder="发消息…"
             rows={1}
-            className="chat-textarea flex-1 resize-none rounded-2xl border border-white/15 bg-white/8 px-4 py-2.5 text-sm text-amber-50 placeholder-amber-100/35 outline-none backdrop-blur transition focus:border-rose-400/40 focus:bg-white/12 focus:ring-1 focus:ring-rose-400/20"
+            className="chat-textarea flex-1 resize-none rounded-2xl border border-white/15 bg-white/8 px-4 py-2.5 text-sm text-gray-900 placeholder-amber-100/35 outline-none backdrop-blur transition focus:border-rose-400/40 focus:bg-white/12 focus:ring-1 focus:ring-rose-400/20"
             style={{ height: "40px", maxHeight: "120px" }}
           />
 
           {/* Image */}
-          <label className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl text-xl text-amber-100/50 transition hover:text-amber-100/80">
+          <label className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl text-xl text-gray-400 transition hover:text-gray-600">
             <input
               type="file"
               accept="image/*"

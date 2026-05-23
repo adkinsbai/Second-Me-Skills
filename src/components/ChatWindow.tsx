@@ -89,7 +89,7 @@ export function ChatWindow() {
 
   return (
     <div className="glass-card flex h-[400px] flex-col overflow-hidden rounded-2xl">
-      <div className="border-b border-amber-100/15 px-4 py-2 text-sm font-medium text-amber-100/85">
+      <div className="border-b border-gray-200 px-4 py-2 text-sm font-medium text-gray-700">
         与数字体共建主人信息库
       </div>
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
@@ -105,7 +105,7 @@ export function ChatWindow() {
               className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${
                 msg.role === "user"
                   ? "border border-rose-400/30 bg-rose-950/40 text-rose-50"
-                  : "border border-amber-100/15 bg-black/35 text-amber-100/90"
+                  : "border border-gray-200 bg-black/35 text-gray-700"
               }`}
             >
               {msg.content}
@@ -114,7 +114,7 @@ export function ChatWindow() {
         ))}
         <div ref={bottomRef} />
       </div>
-      <div className="flex gap-2 border-t border-amber-100/15 bg-black/20 p-3">
+      <div className="flex gap-2 border-t border-gray-200 bg-gray-50 p-3">
         <input
           type="text"
           value={input}

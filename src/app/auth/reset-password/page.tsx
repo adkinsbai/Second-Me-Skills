@@ -55,9 +55,9 @@ function ResetPasswordInner() {
   return (
     <main className="page-shell px-4 py-12">
       <div className="glass-card mx-auto w-full max-w-md space-y-4 rounded-2xl p-6">
-        <p className="text-xs uppercase tracking-[0.25em] text-amber-100/55">Password Reset</p>
+        <p className="text-xs uppercase tracking-[0.25em] text-gray-400">Password Reset</p>
         <h1 className="luxury-title text-2xl font-semibold">重置密码</h1>
-        <p className="text-sm text-amber-100/70">请设置一个新密码，至少 8 位并包含字母和数字。</p>
+        <p className="text-sm text-gray-500">请设置一个新密码，至少 8 位并包含字母和数字。</p>
 
         <input
           type="password"
@@ -85,7 +85,7 @@ function ResetPasswordInner() {
           {loading ? "提交中…" : "确认重置"}
         </button>
 
-        <Link href="/auth" className="inline-block text-xs text-amber-100/70 underline underline-offset-2">
+        <Link href="/auth" className="inline-block text-xs text-gray-500 underline underline-offset-2">
           返回登录
         </Link>
       </div>

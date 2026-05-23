@@ -14,12 +14,7 @@ export async function POST(
     include: { scores: { orderBy: { createdAt: "desc" }, take: 1 } },
   });
   if (!match) return NextResponse.json({ code: 404 }, { status: 404 });
-  const prefs = await prisma.userPreference.findUnique({ where: { userId: user.id } });
-  const threshold = prefs?.heartThreshold ?? 80;
   const latest = match.scores[0];
-  if (!latest || latest.totalScore < threshold) {
-    return NextResponse.json({ code: 403, message: "未达心动阈值，无法解锁聊天" }, { status: 403 });
-  }
   await prisma.match.update({
     where: { id },
     data: { status: "connected" },

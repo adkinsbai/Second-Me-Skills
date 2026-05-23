@@ -30,7 +30,7 @@ export default function RelationshipPage() {
   if (loading) {
     return (
       <main className="page-shell app-container py-10">
-        <p className="luxury-subtitle text-sm">加载中…</p>
+        <p className="text-sm text-gray-500">加载中…</p>
       </main>
     );
   }
@@ -40,8 +40,8 @@ export default function RelationshipPage() {
       <AppHeader backHref={`/matches/${id}`} title="关系沉淀" />
       <div className="app-container max-w-2xl space-y-4 py-8">
         <section className="glass-card rounded-2xl p-4">
-          <h2 className="text-base font-semibold text-amber-50">共同兴趣</h2>
-          <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-amber-100/75">
+          <h2 className="text-base font-semibold text-gray-900">共同兴趣</h2>
+          <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-gray-600">
             {(data?.starterTopics?.length ? data.starterTopics : ["继续从你们最近最有共鸣的话题开始，先保持轻松节奏。"]).map(
               (x, i) => (
                 <li key={i}>{x}</li>
@@ -51,8 +51,8 @@ export default function RelationshipPage() {
         </section>
 
         <section className="glass-card rounded-2xl p-4">
-          <h2 className="text-base font-semibold text-amber-50">重要对话片段</h2>
-          <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-amber-100/75">
+          <h2 className="text-base font-semibold text-gray-900">重要对话片段</h2>
+          <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-gray-600">
             {(data?.relationshipNotes?.memories?.length
               ? data.relationshipNotes.memories
               : ["你们刚刚开始建立连接，后续可把有共鸣的话收藏在这里。"]

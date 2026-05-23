@@ -90,7 +90,7 @@ export function UserProfileEditor() {
     }
   };
 
-  if (loading) return <div className="luxury-subtitle text-sm">加载中...</div>;
+  if (loading) return <div className="text-sm text-gray-500">加载中...</div>;
   if (!info) return null;
 
   return (
@@ -98,11 +98,11 @@ export function UserProfileEditor() {
       <div className="flex items-center gap-3">
         {info.avatar ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={info.avatar} alt="" className="h-12 w-12 rounded-full object-cover ring-2 ring-amber-200/25" />
+          <img src={info.avatar} alt="" className="h-12 w-12 rounded-full object-cover ring-2 ring-gray-200" />
         ) : null}
         <div>
-          <p className="font-medium text-amber-50">{info.name ?? "未设置昵称"}</p>
-          {info.bio ? <p className="text-sm text-amber-100/60">{info.bio}</p> : null}
+          <p className="font-medium text-gray-900">{info.name ?? "未设置昵称"}</p>
+          {info.bio ? <p className="text-sm text-gray-400">{info.bio}</p> : null}
         </div>
         <button
           type="button"
@@ -114,11 +114,11 @@ export function UserProfileEditor() {
       </div>
 
       {info.selfIntroduction ? (
-        <p className="mt-3 text-sm text-amber-100/75">{info.selfIntroduction}</p>
+        <p className="mt-3 text-sm text-gray-600">{info.selfIntroduction}</p>
       ) : null}
 
       {editing ? (
-        <div className="mt-4 space-y-2 rounded-xl border border-amber-100/15 bg-black/25 p-3">
+        <div className="mt-4 space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-3">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -139,10 +139,10 @@ export function UserProfileEditor() {
             className="luxury-input w-full rounded-xl px-3 py-2 text-sm"
           />
 
-          <div className="space-y-2 rounded-xl border border-amber-100/15 bg-black/30 p-3">
+          <div className="space-y-2 rounded-xl border border-gray-200 bg-gray-100 p-3">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-medium text-amber-100/85">可选：上传 3 张照片</p>
-              <span className="text-[11px] text-amber-100/45">建议小图（不超过 200KB/张）</span>
+              <p className="text-xs font-medium text-gray-700">可选：上传 3 张照片</p>
+              <span className="text-[11px] text-gray-400">建议小图（不超过 200KB/张）</span>
             </div>
 
             <input
@@ -181,7 +181,7 @@ export function UserProfileEditor() {
               <div className="grid grid-cols-3 gap-2">
                 {previewPhotos.slice(0, 3).map((p, idx) => (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <div key={idx} className="h-20 w-full overflow-hidden rounded-lg bg-black/30 ring-1 ring-amber-100/15">
+                  <div key={idx} className="h-20 w-full overflow-hidden rounded-lg bg-gray-100 ring-1 ring-gray-200">
                     <img src={p} alt={`photo-${idx}`} className="h-full w-full object-cover" />
                   </div>
                 ))}

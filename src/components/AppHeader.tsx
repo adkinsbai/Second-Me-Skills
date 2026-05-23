@@ -1,43 +1,61 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
-type AppHeaderNavRightProps = {
-  /** 传入时用按钮 + 客户端回调；不传则用表单 POST /api/auth/logout */
-  onLogout?: () => void;
-};
+const NAV_ITEMS = [
+  { href: "/matches",            label: "主页" },
+  { href: "/profile",            label: "个人主页" },
+  { href: "/settings/heartbeat", label: "心动设置" },
+  { href: "/discover",           label: "翻牌" },
+  { href: "/town",               label: "小镇" },
+];
 
-/** 顶栏右侧：个人主页 / 心动设置 / 丘比小镇 / 退出（供各页与默认 AppHeader 共用） */
+type AppHeaderNavRightProps = { onLogout?: () => void };
+
 export function AppHeaderNavRight({ onLogout }: AppHeaderNavRightProps = {}) {
+  const pathname = usePathname();
   return (
-    <nav
-      className="flex shrink-0 items-center justify-end gap-x-2 whitespace-nowrap"
-      aria-label="账户与小镇"
-    >
-      <Link href="/matches" className="text-sm text-amber-100/85 transition hover:text-amber-50">
-        个人主页
-      </Link>
-      <Link href="/settings/heartbeat" className="text-sm text-amber-100/70 transition hover:text-amber-50">
-        心动设置
-      </Link>
-      <Link
-        href="/town"
-        className="rounded-full bg-gradient-to-r from-rose-600 to-pink-600 px-2.5 py-1.5 text-sm font-semibold text-white shadow-md shadow-rose-900/30 ring-1 ring-white/25 transition hover:brightness-110"
-      >
-        丘比小镇
-      </Link>
+    <nav className="flex shrink-0 items-center gap-0.5" aria-label="主导航">
+      {NAV_ITEMS.map((item) => {
+        const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
+        if (item.href === "/town") {
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="ml-1 rounded-xl border-2 border-[var(--ink)] bg-[var(--love)] px-3.5 py-1.5 text-xs font-black text-white shadow-[3px_3px_0_var(--ink)] transition hover:-translate-y-0.5"
+            >
+              {item.label}
+            </Link>
+          );
+        }
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={`rounded-xl border-2 px-3 py-1.5 text-xs font-black transition ${
+              isActive
+                ? "border-[var(--ink)] bg-[var(--brand)] text-[var(--ink)] shadow-[3px_3px_0_var(--ink)]"
+                : "border-transparent text-[var(--ink)] hover:border-[var(--ink)] hover:bg-[var(--paper-2)]"
+            }`}
+          >
+            {item.label}
+          </Link>
+        );
+      })}
       {onLogout != null ? (
         <button
           type="button"
           onClick={onLogout}
-          className="text-sm text-amber-200/65 transition hover:text-amber-100"
+          className="ml-1 rounded-xl px-3 py-1.5 text-xs font-bold text-[var(--muted-ink)] transition hover:bg-[var(--ink)] hover:text-[var(--brand)]"
         >
-          退出登录
+          退出
         </button>
       ) : (
         <form action="/api/auth/logout" method="POST" className="inline">
-          <button type="submit" className="text-sm text-amber-200/65 transition hover:text-amber-100">
-            退出登录
+          <button type="submit" className="ml-1 rounded-xl px-3 py-1.5 text-xs font-bold text-[var(--muted-ink)] transition hover:bg-[var(--ink)] hover:text-[var(--brand)]">
+            退出
           </button>
         </form>
       )}
@@ -45,32 +63,36 @@ export function AppHeaderNavRight({ onLogout }: AppHeaderNavRightProps = {}) {
   );
 }
 
-type Props = {
-  title?: string;
-  backHref?: string;
-  right?: React.ReactNode;
-};
+type Props = { title?: string; backHref?: string; right?: React.ReactNode };
 
 export function AppHeader({ title, backHref, right }: Props) {
   const showTitle = typeof title === "string" && title.trim().length > 0;
   return (
-    <header className="sticky top-0 z-20 border-b border-amber-200/20 bg-[#0c111b]/70 backdrop-blur-xl">
-      <div className="app-container flex min-h-16 items-center justify-between gap-x-3 py-2 sm:min-h-[4rem] sm:py-0">
-        <div className="flex min-w-0 max-w-full flex-1 items-center gap-3 sm:max-w-[min(55%,28rem)] sm:flex-none">
+    <header className="sticky top-0 z-20 border-b-2 border-[var(--ink)] bg-[var(--paper)]/90 backdrop-blur-xl">
+      <div className="app-container flex min-h-[3.5rem] items-center justify-between gap-x-3 py-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
           {backHref != null ? (
             <Link
               href={backHref}
-              className="shrink-0 rounded-full border border-amber-100/20 px-3 py-1 text-sm text-amber-100/85 transition hover:border-amber-100/40 hover:text-amber-50"
+              className="flex shrink-0 items-center gap-1.5 rounded-xl border-2 border-[var(--ink)] bg-[var(--paper-2)] px-3 py-1.5 text-xs font-black text-[var(--ink)] shadow-[3px_3px_0_var(--ink)] transition hover:bg-[var(--brand)]"
             >
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
               返回
             </Link>
           ) : (
-            <Link href="/" className="shrink-0 font-semibold tracking-wide text-amber-50 transition hover:opacity-90">
-              丘比
+            <Link href="/" className="flex shrink-0 items-center gap-2 group">
+              <div className="flex h-8 w-8 rotate-[-6deg] items-center justify-center rounded-xl border-2 border-[var(--ink)] bg-[var(--brand)] shadow-[3px_3px_0_var(--ink)] transition group-hover:rotate-3">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="black">
+                  <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                </svg>
+              </div>
+              <span className="text-sm font-black tracking-tight text-white">丘比</span>
             </Link>
           )}
           {showTitle && (
-            <span className="min-w-0 truncate text-sm font-medium tracking-wide text-amber-100/90">{title}</span>
+            <span className="min-w-0 truncate text-sm font-black text-[var(--ink)]">{title}</span>
           )}
         </div>
         {right !== undefined ? right : <AppHeaderNavRight />}

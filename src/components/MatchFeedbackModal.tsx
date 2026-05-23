@@ -56,37 +56,37 @@ export function MatchFeedbackModal({ matchId, open, onClose }: Props) {
     onChange: (n: number) => void;
   }) => (
     <div>
-      <p className="text-sm font-medium text-amber-100/85">{label}</p>
+      <p className="text-sm font-medium text-gray-700">{label}</p>
       <div className="mt-1 flex gap-1">
         {Array.from({ length: STAR_MAX }, (_, i) => i + 1).map((n) => (
           <button
             key={n}
             type="button"
             onClick={() => onChange(n)}
-            className="text-2xl leading-none text-amber-200/90 transition hover:scale-110"
+            className="text-2xl leading-none text-[var(--brand-text)]/90 transition hover:scale-110"
           >
             {n <= value ? "★" : "☆"}
           </button>
         ))}
-        <span className="ml-2 text-sm text-amber-100/50">{value}/5</span>
+        <span className="ml-2 text-sm text-gray-400">{value}/5</span>
       </div>
     </div>
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 p-4 backdrop-blur-sm">
       <div className="glass-card w-full max-w-md rounded-2xl p-6 shadow-2xl">
         {done ? (
-          <p className="text-center text-amber-200">已保存，感谢反馈～</p>
+          <p className="text-center text-[var(--brand-text)]">已保存，感谢反馈～</p>
         ) : (
           <>
-            <h3 className="mb-4 text-lg font-medium text-amber-50">聊天后打分</h3>
+            <h3 className="mb-4 text-lg font-medium text-gray-900">聊天后打分</h3>
             <div className="space-y-4">
               <StarRow label="聊天感觉" value={vibeScore} onChange={setVibeScore} />
               <StarRow label="价值观契合度" value={valuesScore} onChange={setValuesScore} />
               <StarRow label="未来发展潜力" value={potentialScore} onChange={setPotentialScore} />
               <div>
-                <p className="text-sm font-medium text-amber-100/85">想对丘比说的话（可选）</p>
+                <p className="text-sm font-medium text-gray-700">想对丘比说的话（可选）</p>
                 <textarea
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}

@@ -31,7 +31,7 @@ export default function UserPublicPage() {
   if (loading) {
     return (
       <main className="page-shell app-container py-10">
-        <p className="luxury-subtitle text-sm">加载中…</p>
+        <p className="text-sm text-gray-500">加载中…</p>
       </main>
     );
   }
@@ -39,7 +39,7 @@ export default function UserPublicPage() {
   if (!info) {
     return (
       <main className="page-shell app-container py-10">
-        <p className="luxury-subtitle text-sm">无法获取对方主页</p>
+        <p className="text-sm text-gray-500">无法获取对方主页</p>
       </main>
     );
   }
@@ -50,29 +50,29 @@ export default function UserPublicPage() {
       <div className="app-container max-w-3xl space-y-5 py-8">
         <section className="glass-card rounded-2xl p-5">
           <div className="flex items-center gap-4">
-            <div className="h-16 w-16 overflow-hidden rounded-full bg-gradient-to-br from-amber-400/20 to-sky-400/15 ring-1 ring-amber-200/25">
+            <div className="h-16 w-16 overflow-hidden rounded-full bg-gradient-to-br from-amber-400/20 to-sky-400/15 ring-1 ring-gray-200">
               {info.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={info.avatarUrl} alt="" className="h-full w-full object-cover" />
               ) : (
-                <div className="flex h-full w-full items-center justify-center text-2xl text-amber-200/50">
+                <div className="flex h-full w-full items-center justify-center text-2xl text-[var(--brand-text)]/50">
                   {info.name?.[0] ?? "?"}
                 </div>
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-lg font-semibold text-amber-50">{info.name ?? "未设置昵称"}</p>
-              <p className="mt-1 whitespace-pre-wrap text-sm text-amber-100/70">{info.bio || "—"}</p>
+              <p className="truncate text-lg font-semibold text-gray-900">{info.name ?? "未设置昵称"}</p>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-gray-500">{info.bio || "—"}</p>
             </div>
           </div>
         </section>
 
         {!!info.photos.length && (
           <section className="glass-card rounded-2xl p-5">
-            <p className="mb-3 text-sm font-semibold text-amber-100/90">TA 的照片（可选）</p>
+            <p className="mb-3 text-sm font-semibold text-gray-700">TA 的照片（可选）</p>
             <div className="grid grid-cols-3 gap-2">
               {info.photos.slice(0, 3).map((p, idx) => (
-                <div key={idx} className="h-28 overflow-hidden rounded-lg bg-black/30 ring-1 ring-amber-100/15">
+                <div key={idx} className="h-28 overflow-hidden rounded-lg bg-gray-100 ring-1 ring-gray-200">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={p} alt={`photo-${idx}`} className="h-full w-full object-cover" />
                 </div>

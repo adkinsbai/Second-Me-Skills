@@ -28,6 +28,8 @@ export async function GET(request: NextRequest) {
     orderBy: { createdAt: "desc" },
     include: {
       author: { select: { id: true, name: true, avatarUrl: true } },
+      _count: { select: { likes: true, comments: true } },
+      likes: { where: { userId: user.id }, select: { id: true }, take: 1 },
     },
     take: 60,
   });
@@ -43,6 +45,9 @@ export async function GET(request: NextRequest) {
         categories: parseCategoriesJson(p.categoriesJson),
         author: p.author,
         createdAt: p.createdAt.toISOString(),
+        likeCount: p._count.likes,
+        commentCount: p._count.comments,
+        likedByMe: p.likes.length > 0,
       })),
     },
   });

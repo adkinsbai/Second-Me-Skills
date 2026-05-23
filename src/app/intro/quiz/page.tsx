@@ -49,14 +49,14 @@ export default function IntroQuizPage() {
     <main className="page-shell">
       <AppHeader backHref="/matches" title="让我更了解你" />
       <div className="app-container max-w-xl py-8">
-        <p className="mb-2 text-sm text-amber-100/55">第 {step + 1} / {QUESTIONS.length} 题</p>
-        <p className="mb-6 text-lg font-medium text-amber-50">{currentQ}</p>
+        <p className="mb-2 text-sm text-gray-400">第 {step + 1} / {QUESTIONS.length} 题</p>
+        <p className="mb-6 text-lg font-medium text-gray-900">{currentQ}</p>
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="请简单写几句～"
           rows={4}
-          className="luxury-input w-full rounded-xl px-4 py-3 placeholder:text-amber-100/40"
+          className="luxury-input w-full rounded-xl px-4 py-3 placeholder:text-gray-300"
         />
         <button
           type="button"

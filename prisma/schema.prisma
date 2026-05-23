@@ -25,6 +25,9 @@ model User {
   gender            String?  @map("gender")
   // 双向年龄期望；未填则仅依据偏好区间重叠规则
   age               Int?     @map("age")
+  latitude          Float?   @map("latitude")
+  longitude         Float?   @map("longitude")
+  locationUpdatedAt DateTime? @map("location_updated_at")
 
   photo1           String?  @map("photo_1")
   photo2           String?  @map("photo_2")
@@ -34,6 +37,8 @@ model User {
   agentLearnConsent Boolean @default(false) @map("agent_learn_consent")
   resetPasswordTokenHash String? @map("reset_password_token_hash")
   resetPasswordExpiresAt DateTime? @map("reset_password_expires_at")
+  shortId        String? @unique @map("short_id")
+  profileAnswers Json?   @map("profile_answers")
 
   sessions         Session[]
   ownerFacts       OwnerFact[]
@@ -42,7 +47,8 @@ model User {
   matchesAsTarget  Match[]         @relation("TargetUserMatches")
   feedbacksGiven   MatchFeedback[]
   matchReads       MatchRead[]    @relation("MatchReadUser")
-  agentChatGenerationJobs AgentChatGenerationJob[] @relation("OwnerAgentChatGenerationJobs")
+  swipeDecisionsGiven UserSwipeDecision[] @relation("SwipeDecisionViewer")
+  swipeDecisionsReceived UserSwipeDecision[] @relation("SwipeDecisionTarget")
 
   townPosts TownPost[]
   townCandidateRounds TownCandidateRound[]
@@ -50,8 +56,12 @@ model User {
   townConversationsAsCandidate TownConversation[] @relation("TownCandidate")
   townConversationReads TownConversationRead[] @relation("TownConversationReadsUser")
   townConversationMessages TownConversationMessage[] @relation("TownConversationMessageSender")
+  townPostLikes TownPostLike[]
+  townPostComments TownPostComment[]
 
   profileEmbedding UserEmbedding?
+  matchingProfile UserMatchingProfile?
+  preferenceSignal UserPreferenceSignal?
 
   @@map("users")
 }
@@ -67,6 +77,36 @@ model UserEmbedding {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_embeddings")
+}
+
+model UserMatchingProfile {
+  userId          String   @id @map("user_id")
+  summaryJson     Json     @map("summary_json")
+  traitsJson      Json     @map("traits_json")
+  signalsJson     Json     @map("signals_json")
+  embeddingJson   Json?    @map("embedding_json")
+  lastRefreshedAt DateTime @default(now()) @map("last_refreshed_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_matching_profiles")
+}
+
+model UserPreferenceSignal {
+  userId                 String   @id @map("user_id")
+  likedTraitsJson         Json     @map("liked_traits_json")
+  unlikedTraitsJson       Json     @map("unliked_traits_json")
+  photoPreferenceJson     Json?    @map("photo_preference_json")
+  geoPreferenceJson       Json?    @map("geo_preference_json")
+  professionPreferenceJson Json?   @map("profession_preference_json")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+  createdAt              DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preference_signals")
 }
 
 model OwnerFact {
@@ -135,7 +175,6 @@ model Match {
   messages    MatchMessage[]
   feedbacks   MatchFeedback[]
   matchReads  MatchRead[]    @relation("MatchReadMatch")
-  agentChatGenerationJobs AgentChatGenerationJob[] @relation("MatchAgentChatGenerationJobs")
 
   @@index([userId])
   @@index([targetUserId])
@@ -205,22 +244,23 @@ model MatchRead {
   @@map("match_reads")
 }
 
-model AgentChatGenerationJob {
-  id            String   @id @default(cuid())
-  matchId       String   @unique @map("match_id")
-  ownerUserId   String   @map("owner_user_id")
-  status        String   @map("status") // "queued" | "running" | "done" | "failed" | "stopped"
-  stopReason    String?  @map("stop_reason")
-  generatedCount Int      @default(0) @map("generated_count")
-  lastTurnAt    DateTime? @map("last_turn_at")
-  errorMessage  String?  @map("error_message")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+model UserSwipeDecision {
+  id                 String   @id @default(cuid())
+  viewerId           String   @map("viewer_id")
+  targetUserId       String   @map("target_user_id")
+  action             String   @map("action") // like | unlike
+  source             String   @default("discover") @map("source")
+  targetSnapshotJson Json?    @map("target_snapshot_json")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
-  match Match @relation("MatchAgentChatGenerationJobs", fields: [matchId], references: [id], onDelete: Cascade)
-  owner User  @relation("OwnerAgentChatGenerationJobs", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  viewer User @relation("SwipeDecisionViewer", fields: [viewerId], references: [id], onDelete: Cascade)
+  target User @relation("SwipeDecisionTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
 
-  @@map("agent_chat_generation_jobs")
+  @@unique([viewerId, targetUserId])
+  @@index([viewerId, action, createdAt])
+  @@index([targetUserId, action, createdAt])
+  @@map("user_swipe_decisions")
 }
 
 model TownPost {
@@ -236,9 +276,39 @@ model TownPost {
 
   candidateRounds TownCandidateRound[]
   conversations TownConversation[]
+  likes    TownPostLike[]
+  comments TownPostComment[]
 
   @@index([userId])
   @@map("town_posts")
+}
+
+model TownPostLike {
+  id        String   @id @default(cuid())
+  postId    String   @map("post_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post TownPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([postId])
+  @@map("town_post_likes")
+}
+
+model TownPostComment {
+  id        String   @id @default(cuid())
+  postId    String   @map("post_id")
+  userId    String   @map("user_id")
+  content   String   @map("content")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post TownPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt])
+  @@map("town_post_comments")
 }
 
 model TownCandidateRound {

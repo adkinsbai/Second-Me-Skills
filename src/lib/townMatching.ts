@@ -69,7 +69,7 @@ export async function rankTownCandidates(params: {
   const poolCandidates = await prisma.user.findMany({
     where: {
       id: { notIn: excludeIds },
-      authProvider: { not: "" },
+      authProvider: { notIn: ["", "guest"] },
     },
     include: { preference: true },
     take: 60,

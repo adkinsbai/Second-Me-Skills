@@ -10,12 +10,10 @@ type Detail = {
   status: string;
   targetUser: { id: string; name: string | null; avatarUrl: string | null; bio: string | null };
   latestScore: {
-    totalScore: number;
     summary: string;
+    matchReason: string;
   } | null;
-  heartThreshold: number;
   canUnlockChat: boolean;
-  starterTopics?: string[];
 };
 
 export default function MatchDetailPage() {
@@ -54,7 +52,7 @@ export default function MatchDetailPage() {
   if (loading || !detail) {
     return (
       <main className="page-shell app-container py-10">
-        <p className="luxury-subtitle text-sm">加载中…</p>
+        <p className="text-sm text-gray-500">加载中…</p>
       </main>
     );
   }
@@ -64,31 +62,29 @@ export default function MatchDetailPage() {
       <AppHeader backHref="/matches" title={detail.targetUser.name ?? "匹配详情"} />
       <div className="app-container max-w-2xl space-y-6 py-8">
         <div className="glass-card flex gap-4 rounded-2xl p-4">
-          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-amber-400/20 to-sky-400/15 ring-1 ring-amber-200/25">
+          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-amber-400/20 to-sky-400/15 ring-1 ring-gray-200">
             {detail.targetUser.avatarUrl ? (
               <img src={detail.targetUser.avatarUrl} alt="" className="h-full w-full object-cover" />
             ) : (
-              <div className="flex h-full w-full items-center justify-center text-2xl text-amber-200/50">
+              <div className="flex h-full w-full items-center justify-center text-2xl text-[var(--brand-text)]/50">
                 {detail.targetUser.name?.[0] ?? "?"}
               </div>
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="font-medium text-amber-50">{detail.targetUser.name ?? "未设置昵称"}</p>
-            <p className="text-sm text-amber-100/65">{detail.targetUser.bio ?? "—"}</p>
+            <p className="font-medium text-gray-900">{detail.targetUser.name ?? "未设置昵称"}</p>
+            <p className="text-sm text-gray-500">{detail.targetUser.bio ?? "—"}</p>
             {detail.latestScore && (
-              <p className="mt-2 text-sm text-amber-100/80">
-                总分 <strong className="text-amber-200">{detail.latestScore.totalScore}</strong> 分（阈值 {detail.heartThreshold}）
-              </p>
+              <p className="mt-2 text-sm leading-6 text-gray-600">{detail.latestScore.matchReason}</p>
             )}
           </div>
         </div>
 
         <div className="space-y-3">
-          <div className="glass-card rounded-2xl p-4 text-amber-100/70">
-            <span className="font-medium text-amber-50">真实匹配</span>
+          <div className="glass-card rounded-2xl p-4 text-gray-500">
+            <span className="font-medium text-gray-900">真实匹配</span>
             <p className="mt-1 text-sm">
-              本版以双向心动设置 + 资料向量筛选为主；双方 Agent 代聊实验入口已关闭（相关代码仍保留在仓库中）。
+              丘比会根据双方资料、偏好和信息库做真实用户匹配；匹配后直接进入真人聊天。
             </p>
           </div>
           {detail.latestScore ? (
@@ -96,13 +92,13 @@ export default function MatchDetailPage() {
               href={`/matches/${id}/report`}
               className="glass-card block rounded-2xl p-4 text-left transition hover:border-amber-200/45"
             >
-              <span className="font-medium text-amber-50">多维度评分报告</span>
-              <p className="text-sm text-amber-100/65">{detail.latestScore.summary}</p>
+              <span className="font-medium text-gray-900">丘比写给你们的话</span>
+              <p className="text-sm text-gray-500">{detail.latestScore.summary}</p>
             </Link>
           ) : (
-            <div className="glass-card rounded-2xl p-4 text-amber-100/55">
-              <span className="font-medium text-amber-100/85">多维度评分报告</span>
-              <p className="text-sm">匹配生成并写入分数后即可查看报告</p>
+            <div className="glass-card rounded-2xl p-4 text-gray-400">
+              <span className="font-medium text-gray-700">丘比写给你们的话</span>
+              <p className="text-sm">匹配生成后即可查看这段故事开场</p>
             </div>
           )}
           {detail.status === "connected" ? (
@@ -131,7 +127,7 @@ export default function MatchDetailPage() {
               <div className="glass-card rounded-2xl border border-sky-400/20 p-4">
                 <p className="text-sm font-medium text-sky-100">真人开场话题包（可直接用）</p>
                 <ul className="mt-2 space-y-1 text-sm text-sky-100/80">
-                  {(detail.starterTopics?.length ? detail.starterTopics : ["先聊今天一个小日常，再问 TA 最近最开心的一件事。", "从你们都提到的兴趣切入，问“最近最想做的一件小事”。", "先确认聊天节奏：你喜欢高频还是慢热？"]).map((t, i) => (
+                  {["先聊今天一个小日常，再问 TA 最近最开心的一件事。", "从你们都提到的兴趣切入，问“最近最想做的一件小事”。", "先确认聊天节奏：你喜欢高频还是慢热？"].map((t, i) => (
                     <li key={i}>- {t}</li>
                   ))}
                 </ul>
@@ -144,13 +140,13 @@ export default function MatchDetailPage() {
               disabled={unlocking}
               className="luxury-btn block w-full rounded-2xl p-4 text-left text-sm font-semibold disabled:opacity-50"
             >
-              {unlocking ? "解锁中…" : "达标 · 点击解锁与对方聊天"}
+              {unlocking ? "准备中…" : "点击开始与对方聊天"}
             </button>
           ) : (
-            <div className="glass-card rounded-2xl p-4 text-amber-100/60">
-              <span className="font-medium text-amber-100/85">与对方聊天</span>
-              <p className="text-sm">总分达到心动阈值后可解锁</p>
-              <p className="mt-1 text-xs text-rose-200/80">解锁后可看更多真实资料与话题建议。</p>
+            <div className="glass-card rounded-2xl p-4 text-gray-400">
+              <span className="font-medium text-gray-700">与对方聊天</span>
+              <p className="text-sm">正在准备聊天入口</p>
+              <p className="mt-1 text-xs text-rose-200/80">准备好后可看更多真实资料与话题建议。</p>
             </div>
           )}
         </div>

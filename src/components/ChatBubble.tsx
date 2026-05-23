@@ -94,7 +94,7 @@ export function ChatTimeDivider({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-3 py-2">
       <div className="h-px flex-1 bg-white/10" />
-      <span className="text-[11px] text-amber-100/40">{label}</span>
+      <span className="text-[11px] text-gray-300">{label}</span>
       <div className="h-px flex-1 bg-white/10" />
     </div>
   );
@@ -126,7 +126,7 @@ export function ChatBubble({
           className={`chat-bubble relative rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${
             isSelf
               ? "chat-bubble-self rounded-br-sm bg-gradient-to-br from-rose-500/80 to-rose-600/70 text-rose-50 ring-1 ring-rose-400/30"
-              : "chat-bubble-other rounded-bl-sm border border-white/10 bg-white/8 text-amber-50 backdrop-blur-md"
+              : "chat-bubble-other rounded-bl-sm border border-white/10 bg-white/8 text-gray-900 backdrop-blur-md"
           }`}
         >
           {renderContent(msg.content)}
@@ -137,7 +137,7 @@ export function ChatBubble({
             <span className="text-[11px] font-medium text-red-400">发送失败</span>
           )}
           {msg.pending && !msg.failed && (
-            <span className="text-[11px] text-amber-100/40">发送中…</span>
+            <span className="text-[11px] text-gray-300">发送中…</span>
           )}
           {isSelf && !msg.pending && !msg.failed && showReadStatus && (
             msg.readByOther ? (

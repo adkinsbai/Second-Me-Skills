@@ -25,7 +25,7 @@ export async function GET() {
 
   const dbUser = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { name: true, avatarUrl: true, bio: true, photo1: true, photo2: true, photo3: true },
+    select: { name: true, avatarUrl: true, bio: true, photo1: true, photo2: true, photo3: true, shortId: true },
   });
   return NextResponse.json({
     code: 0,
@@ -34,6 +34,7 @@ export async function GET() {
       avatar: dbUser?.avatarUrl ?? user.avatarUrl ?? "",
       bio: dbUser?.bio ?? "",
       selfIntroduction: dbUser?.bio ?? "先完善资料，让对方更了解你。",
+      shortId: dbUser?.shortId ?? null,
       photos: [dbUser?.photo1, dbUser?.photo2, dbUser?.photo3].filter(
         (x): x is string => typeof x === "string" && x.trim().length > 0
       ),

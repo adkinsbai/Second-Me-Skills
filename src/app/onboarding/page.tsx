@@ -46,11 +46,11 @@ function OnboardingInner() {
     <main className="page-shell px-4 py-10">
       <div className="glass-card mx-auto max-w-lg space-y-6 rounded-2xl p-6">
         <div>
-          <p className="text-xs uppercase tracking-[0.28em] text-amber-100/50">Welcome</p>
+          <p className="text-xs uppercase tracking-[0.28em] text-gray-400">Welcome</p>
           <h1 className="luxury-title mt-2 text-xl font-semibold">欢迎来到丘比</h1>
-          <p className="mt-2 text-sm leading-relaxed text-amber-100/70">
-            花 1 分钟了解我们在做什么：丘比用<strong className="text-amber-100/95">你的专属 Agent</strong>先与对方 Agent 进行「初识对话」，基于双方
-            <strong className="text-amber-100/95">真实资料与信息库</strong>试探合拍度，再把你带到真人聊天阶段。匹配引擎会综合人格向量、沟通节奏、价值观等维度做推荐。
+          <p className="mt-2 text-sm leading-relaxed text-gray-500">
+            花 1 分钟了解我们在做什么：丘比会基于双方
+            <strong className="text-amber-100/95">真实资料与信息库</strong>判断合拍度，只把更值得认识的人带到你面前。匹配引擎会综合人格向量、沟通节奏、价值观等维度做推荐。
           </p>
         </div>
 
@@ -58,12 +58,12 @@ function OnboardingInner() {
           <p className="font-medium">你将能使用</p>
           <ul className="mt-2 list-disc space-y-1 pl-5">
             <li>心动设置与每日推荐（真实用户池匹配）</li>
-            <li>匹配后观看双方 Agent 初识对话（最多 100 条，内容需有依据）</li>
-            <li>达标后解锁真人聊天、关系沉淀与对方主页</li>
+            <li>匹配后直接进入真人聊天、关系沉淀与对方主页</li>
+            <li>查看丘比写给你们的故事开场</li>
           </ul>
         </div>
 
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-amber-100/20 bg-black/25 p-3 text-sm text-amber-100/85">
+        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
           <input
             type="checkbox"
             className="mt-1 accent-amber-400"
@@ -72,17 +72,17 @@ function OnboardingInner() {
           />
           <span>
             我已阅读并同意
-            <Link href="/privacy" className="mx-1 text-amber-200 underline underline-offset-2">
+            <Link href="/privacy" className="mx-1 text-[var(--brand-text)] underline underline-offset-2">
               《隐私与数据说明》
             </Link>
-            ：丘比会处理你主动填写的资料、聊天与 Agent 对话内容，用于匹配与产品改进；你可随时在设置中撤回授权。
+            ：丘比会处理你主动填写的资料与聊天内容，用于匹配与产品改进；你可随时在设置中撤回授权。
           </span>
         </label>
 
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-rose-400/25 bg-rose-950/25 p-3 text-sm text-amber-100/85">
+        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-rose-400/25 bg-rose-950/25 p-3 text-sm text-gray-700">
           <input type="checkbox" className="mt-1 accent-rose-400" checked={learn} onChange={(e) => setLearn(e.target.checked)} />
           <span>
-            允许我的专属 Agent <strong className="text-amber-50">学习我在真人聊天中的表达习惯与情绪方式</strong>（写入本地信息库，用于更懂我与更准匹配）。可随时关闭。
+            允许我的专属 Agent <strong className="text-gray-900">学习我在真人聊天中的表达习惯与情绪方式</strong>（写入本地信息库，用于更懂我与更准匹配）。可随时关闭。
           </span>
         </label>
 

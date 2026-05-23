@@ -65,7 +65,7 @@ export default function TownMessagesPage() {
         <div className="town-on-light">
           <AppHeader backHref="/town" title="消息中心" />
           <div className="app-container py-12">
-            <p className="luxury-subtitle text-sm">加载中…</p>
+            <p className="text-sm text-gray-500">加载中…</p>
           </div>
         </div>
       </TownScaffold>
@@ -93,8 +93,8 @@ export default function TownMessagesPage() {
 
         {groups.length === 0 ? (
           <div className="glass-card rounded-3xl p-8 text-center">
-            <p className="luxury-subtitle text-sm">暂无小镇会话</p>
-            <p className="mt-2 text-sm text-amber-100/70">去“发布”匹配候选并开始对话吧</p>
+            <p className="text-sm text-gray-500">暂无小镇会话</p>
+            <p className="mt-2 text-sm text-gray-500">去“发布”匹配候选并开始对话吧</p>
             <div className="mt-5">
               <Link href="/town/my-needs" className="luxury-btn inline-block rounded-2xl px-6 py-3 text-sm font-semibold">
                 去发布
@@ -107,7 +107,7 @@ export default function TownMessagesPage() {
               <section key={g.post.id} className="glass-card rounded-3xl p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <h2 className="truncate text-base font-semibold text-amber-50">{g.post.title}</h2>
+                    <h2 className="truncate text-base font-semibold text-gray-900">{g.post.title}</h2>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {g.post.categories.map((c) => (
                         <span key={c} className="luxury-chip text-[11px]">
@@ -116,7 +116,7 @@ export default function TownMessagesPage() {
                       ))}
                     </div>
                   </div>
-                  <div className="text-xs text-amber-100/45">{g.conversations.length} 个会话</div>
+                  <div className="text-xs text-gray-400">{g.conversations.length} 个会话</div>
                 </div>
 
                 <div className="mt-4 space-y-2">
@@ -125,34 +125,34 @@ export default function TownMessagesPage() {
                       key={c.conversationId}
                       type="button"
                       onClick={() => router.push(`/town/conversations/${c.conversationId}`)}
-                      className="w-full rounded-2xl border border-amber-200/15 bg-black/25 p-4 text-left transition hover:border-amber-200/35"
+                      className="w-full rounded-2xl border border-amber-200/15 bg-gray-50 p-4 text-left transition hover:border-gray-200"
                     >
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex min-w-0 items-center gap-3">
-                          <div className="h-12 w-12 overflow-hidden rounded-full border border-amber-200/20 bg-black/30">
+                          <div className="h-12 w-12 overflow-hidden rounded-full border border-gray-200 bg-gray-100">
                             {c.otherUser.avatarUrl ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={c.otherUser.avatarUrl} alt="" className="h-full w-full object-cover" />
                             ) : (
-                              <div className="flex h-full w-full items-center justify-center text-sm text-amber-100/60">
+                              <div className="flex h-full w-full items-center justify-center text-sm text-gray-400">
                                 {(c.otherUser.name?.[0] ?? "?").toString()}
                               </div>
                             )}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="truncate font-medium text-amber-50">{c.otherUser.name ?? "未设置昵称"}</p>
-                            <p className="mt-1 truncate text-sm text-amber-100/60">
+                            <p className="truncate font-medium text-gray-900">{c.otherUser.name ?? "未设置昵称"}</p>
+                            <p className="mt-1 truncate text-sm text-gray-400">
                               {c.lastMessage?.content ?? "暂无消息，先开口吧"}
                             </p>
                           </div>
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
                           {c.unreadCount > 0 ? (
-                            <span className="rounded-full border border-amber-200/25 bg-amber-200/15 px-2 py-1 text-[11px] text-amber-50">
+                            <span className="rounded-full border border-gray-200 bg-amber-200/15 px-2 py-1 text-[11px] text-gray-900">
                               未读 {c.unreadCount}
                             </span>
                           ) : (
-                            <span className="text-[11px] text-amber-100/40">已读</span>
+                            <span className="text-[11px] text-gray-300">已读</span>
                           )}
                         </div>
                       </div>

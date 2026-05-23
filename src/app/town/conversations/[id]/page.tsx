@@ -93,7 +93,7 @@ export default function TownConversationPage() {
       <main className="page-shell">
         <AppHeader backHref="/town/messages" title="小镇聊天" />
         <div className="app-container py-12">
-          <p className="luxury-subtitle text-sm">加载中…</p>
+          <p className="text-sm text-gray-500">加载中…</p>
         </div>
       </main>
     );
@@ -106,8 +106,8 @@ export default function TownConversationPage() {
         <div className="glass-card rounded-3xl overflow-hidden">
           <div className="p-4 border-b border-amber-200/15">
             <div className="flex items-center justify-between gap-4">
-              <p className="text-xs uppercase tracking-[0.32em] text-amber-100/60">Town Chat</p>
-              <p className="text-xs text-amber-100/45">会话按帖子分组</p>
+              <p className="text-xs uppercase tracking-[0.32em] text-gray-400">Town Chat</p>
+              <p className="text-xs text-gray-400">会话按帖子分组</p>
             </div>
           </div>
 
@@ -122,12 +122,12 @@ export default function TownConversationPage() {
                     <div
                       className={`max-w-[82%] rounded-2xl px-3 py-2 text-sm border ${
                         isMe
-                          ? "border-amber-200/25 bg-amber-200/10 text-amber-50"
-                          : "border-amber-100/15 bg-black/25 text-amber-100/85"
+                          ? "border-gray-200 bg-amber-200/10 text-gray-900"
+                          : "border-gray-200 bg-gray-50 text-gray-700"
                       }`}
                     >
                       <p className="whitespace-pre-wrap">{m.content}</p>
-                      <p className="mt-1 text-[11px] text-amber-100/45">{new Date(m.createdAt).toLocaleTimeString()}</p>
+                      <p className="mt-1 text-[11px] text-gray-400">{new Date(m.createdAt).toLocaleTimeString()}</p>
                     </div>
                   </div>
                 );
@@ -154,7 +154,7 @@ export default function TownConversationPage() {
                 {sending ? "发送中…" : "发送"}
               </button>
             </div>
-            <p className="mt-2 text-[11px] text-amber-100/45">消息会进入对方“小镇消息中心”</p>
+            <p className="mt-2 text-[11px] text-gray-400">消息会进入对方“小镇消息中心”</p>
           </div>
         </div>
       </div>

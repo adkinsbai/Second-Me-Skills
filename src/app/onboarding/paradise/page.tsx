@@ -81,7 +81,7 @@ function ParadiseInner() {
         <div className="mx-auto max-w-6xl">
           <div className="glass-card overflow-hidden rounded-[32px] border border-white/10 p-6 sm:p-8">
             <div className="mb-6 flex flex-wrap items-center gap-3">
-              <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.28em] text-amber-100/70">
+              <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.28em] text-gray-500">
                 Qiubi Paradise
               </span>
               <span className="rounded-full border border-rose-300/20 bg-rose-400/10 px-3 py-1 text-xs text-rose-100/85">
@@ -91,7 +91,7 @@ function ParadiseInner() {
 
             <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
               <div>
-                <p className="text-sm uppercase tracking-[0.34em] text-amber-100/55">欢迎来到丘比的小乐园</p>
+                <p className="text-sm uppercase tracking-[0.34em] text-gray-400">欢迎来到丘比的小乐园</p>
                 <h1 className="luxury-title mt-3 max-w-2xl text-4xl font-semibold leading-tight sm:text-5xl">
                   今天开始，很多温柔又有趣的人，
                   <br />
@@ -123,8 +123,8 @@ function ParadiseInner() {
                     { title: "第 3 步", desc: "心动设置可稍后再填，不想被打断也能先进入乐园。" },
                   ].map((item) => (
                     <div key={item.title} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                      <p className="text-sm font-semibold text-amber-50">{item.title}</p>
-                      <p className="mt-2 text-sm leading-6 text-amber-100/65">{item.desc}</p>
+                      <p className="text-sm font-semibold text-gray-900">{item.title}</p>
+                      <p className="mt-2 text-sm leading-6 text-gray-500">{item.desc}</p>
                     </div>
                   ))}
                 </div>
@@ -135,10 +135,10 @@ function ParadiseInner() {
                 <div className="relative rounded-[30px] border border-white/10 bg-white/5 p-4 sm:p-5">
                   <div className="mb-4 flex items-center justify-between">
                     <div>
-                      <p className="text-xs uppercase tracking-[0.28em] text-amber-100/45">今日乐园气氛</p>
-                      <p className="mt-1 text-xl font-semibold text-amber-50">好多优质的人，正在发光</p>
+                      <p className="text-xs uppercase tracking-[0.28em] text-gray-400">今日乐园气氛</p>
+                      <p className="mt-1 text-xl font-semibold text-gray-900">好多优质的人，正在发光</p>
                     </div>
-                    <div className="rounded-full border border-amber-200/20 bg-amber-200/10 px-3 py-1 text-xs text-amber-100/80">
+                    <div className="rounded-full border border-gray-200 bg-amber-200/10 px-3 py-1 text-xs text-gray-600">
                       AI 精选感
                     </div>
                   </div>
@@ -157,10 +157,10 @@ function ParadiseInner() {
                         <div className="relative">
                           <div className="flex items-center justify-between">
                             <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-white/40 to-white/10 ring-1 ring-white/20" />
-                            <span className="text-xs text-amber-100/55">{profile.age} 岁</span>
+                            <span className="text-xs text-gray-400">{profile.age} 岁</span>
                           </div>
-                          <p className="mt-4 text-base font-semibold text-amber-50">{profile.name}</p>
-                          <p className="mt-1 text-sm text-amber-100/80">{profile.vibe}</p>
+                          <p className="mt-4 text-base font-semibold text-gray-900">{profile.name}</p>
+                          <p className="mt-1 text-sm text-gray-600">{profile.vibe}</p>
                           <div className="mt-4 flex flex-wrap gap-2">
                             {profile.tags.map((tag) => (
                               <span key={tag} className="rounded-full border border-white/10 bg-white/8 px-2.5 py-1 text-[11px] text-amber-50/85">
@@ -174,8 +174,8 @@ function ParadiseInner() {
                   </div>
 
                   <div className="mt-4 rounded-2xl border border-rose-200/15 bg-gradient-to-r from-rose-500/10 via-white/5 to-sky-500/10 p-4">
-                    <p className="text-sm font-medium text-amber-50">你的感觉应该是：</p>
-                    <p className="mt-2 text-sm leading-7 text-amber-100/75">
+                    <p className="text-sm font-medium text-gray-900">你的感觉应该是：</p>
+                    <p className="mt-2 text-sm leading-7 text-gray-600">
                       “这里不是刷人头的地方，而是一个会认真把好的人带给我的心动乐园。”
                     </p>
                   </div>
@@ -185,7 +185,7 @@ function ParadiseInner() {
 
             <div className="mt-8 grid gap-4 lg:grid-cols-[1fr_1.2fr]">
               <div className="rounded-[28px] border border-white/10 bg-white/5 p-5">
-                <p className="text-xs uppercase tracking-[0.3em] text-amber-100/45">你会遇见什么样的人</p>
+                <p className="text-xs uppercase tracking-[0.3em] text-gray-400">你会遇见什么样的人</p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {promiseTags.map((tag) => (
                     <span
@@ -224,10 +224,10 @@ function ParadiseInner() {
                         <div className="rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[11px] text-amber-50/90">
                           精选气质
                         </div>
-                        <div className="text-xs text-amber-100/50">{profile.age} 岁</div>
+                        <div className="text-xs text-gray-400">{profile.age} 岁</div>
                       </div>
-                      <h2 className="mt-4 text-lg font-semibold text-amber-50">{profile.name}</h2>
-                      <p className="mt-1 text-sm leading-6 text-amber-100/80">{profile.vibe}</p>
+                      <h2 className="mt-4 text-lg font-semibold text-gray-900">{profile.name}</h2>
+                      <p className="mt-1 text-sm leading-6 text-gray-600">{profile.vibe}</p>
                       <p className="mt-3 text-sm leading-6 text-amber-100/68">{profile.summary}</p>
                     </div>
                   </article>
@@ -238,8 +238,8 @@ function ParadiseInner() {
             <div className="mt-8 rounded-[28px] border border-white/10 bg-gradient-to-r from-white/6 via-rose-400/6 to-sky-400/6 p-5 sm:p-6">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-amber-100/45">下一步建议</p>
-                  <h2 className="mt-2 text-2xl font-semibold text-amber-50">先让丘比更懂你，再去遇见更多开心</h2>
+                  <p className="text-xs uppercase tracking-[0.3em] text-gray-400">下一步建议</p>
+                  <h2 className="mt-2 text-2xl font-semibold text-gray-900">先让丘比更懂你，再去遇见更多开心</h2>
                   <p className="mt-2 max-w-2xl text-sm leading-7 text-amber-100/72">
                     首版界面我先接到了 onboarding 后面。你点“先完善我的资料”会进入资料引导，“去做心动设置”会进入偏好页，“先进去逛逛”则直接回产品首页。
                   </p>

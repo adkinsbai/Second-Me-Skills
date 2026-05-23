@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { TownScaffold } from "@/components/TownScaffold";
+import { TownPostEngagement } from "@/components/TownPostEngagement";
 
 type Author = { id: string; name: string | null; avatarUrl: string | null };
 type TownPost = {
@@ -15,6 +16,9 @@ type TownPost = {
   categories: string[];
   author: Author;
   createdAt: string;
+  likeCount: number;
+  commentCount: number;
+  likedByMe: boolean;
 };
 
 export default function TownExplorePage() {
@@ -52,7 +56,15 @@ export default function TownExplorePage() {
         const d = await r.json().catch(() => null);
         if (cancelled) return;
         if (!d?.data?.posts) return;
-        setPosts(d.data.posts as TownPost[]);
+        const raw = d.data.posts as Record<string, unknown>[];
+        setPosts(
+          raw.map((p) => ({
+            ...(p as TownPost),
+            likeCount: Number(p.likeCount ?? 0),
+            commentCount: Number(p.commentCount ?? 0),
+            likedByMe: !!p.likedByMe,
+          }))
+        );
       } catch {
         // ignore
       }
@@ -79,7 +91,7 @@ export default function TownExplorePage() {
         <div className="town-on-light">
           <AppHeader backHref="/town" title="探索" />
           <div className="app-container py-12">
-            <p className="luxury-subtitle text-sm">加载中…</p>
+            <p className="text-sm text-gray-500">加载中…</p>
           </div>
         </div>
       </TownScaffold>
@@ -125,8 +137,8 @@ export default function TownExplorePage() {
         <div className="space-y-4">
           {filtered.length === 0 ? (
             <div className="glass-card rounded-3xl p-8 text-center">
-              <p className="luxury-subtitle text-sm">暂无匹配需求</p>
-              <p className="mt-2 text-sm text-amber-100/70">换个分类看看，或去发布你的需求</p>
+              <p className="text-sm text-gray-500">暂无匹配需求</p>
+              <p className="mt-2 text-sm text-gray-500">换个分类看看，或去发布你的需求</p>
               <div className="mt-5">
                 <Link href="/town/my-needs" className="luxury-btn inline-block rounded-2xl px-6 py-3 text-sm font-semibold">
                   发布
@@ -138,9 +150,9 @@ export default function TownExplorePage() {
               <article key={p.id} className="glass-card rounded-3xl p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <h2 className="truncate text-base font-semibold text-amber-50">{p.title}</h2>
+                    <h2 className="truncate text-base font-semibold text-gray-900">{p.title}</h2>
                     <p
-                      className="mt-1 overflow-hidden text-ellipsis text-sm text-amber-100/70 [display:-webkit-box] [WebkitLineClamp:3] [WebkitBoxOrient:vertical]"
+                      className="mt-1 overflow-hidden text-ellipsis text-sm text-gray-500 [display:-webkit-box] [WebkitLineClamp:3] [WebkitBoxOrient:vertical]"
                     >
                       {p.content}
                     </p>
@@ -153,19 +165,26 @@ export default function TownExplorePage() {
                     </div>
                   </div>
                   <div className="shrink-0">
-                    <div className="h-12 w-12 overflow-hidden rounded-full border border-amber-200/20 bg-black/20">
+                    <div className="h-12 w-12 overflow-hidden rounded-full border border-gray-200 bg-gray-50">
                       {p.author.avatarUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={p.author.avatarUrl} alt="" className="h-full w-full object-cover" />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center text-sm text-amber-100/50">
+                        <div className="flex h-full w-full items-center justify-center text-sm text-gray-400">
                           {(p.author.name?.[0] ?? "?").toString()}
                         </div>
                       )}
                     </div>
-                    <p className="mt-2 text-center text-xs text-amber-100/60">{p.author.name ?? "匿名"}</p>
+                    <p className="mt-2 text-center text-xs text-gray-400">{p.author.name ?? "匿名"}</p>
                   </div>
                 </div>
+                <TownPostEngagement
+                  postId={p.id}
+                  likeCount={p.likeCount}
+                  commentCount={p.commentCount}
+                  likedByMe={p.likedByMe}
+                  emojiTheme="dark"
+                />
               </article>
             ))
           )}

@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { extractStarterTopics } from "@/lib/relationshipInsights";
+
+function extractMatchReason(reportJson?: string | null, summary?: string | null) {
+  if (reportJson) {
+    try {
+      const parsed = JSON.parse(reportJson) as { matchReason?: unknown };
+      if (typeof parsed.matchReason === "string" && parsed.matchReason.trim()) return parsed.matchReason;
+    } catch {
+      // ignore legacy report payloads
+    }
+  }
+  return summary ?? "";
+}
 
 export async function GET(
   _request: NextRequest,
@@ -15,20 +26,10 @@ export async function GET(
     include: {
       targetUser: { select: { id: true, name: true, avatarUrl: true, bio: true } },
       scores: { orderBy: { createdAt: "desc" }, take: 1 },
-      messages: {
-        where: { senderType: { in: ["agent_self", "agent_target"] } },
-        orderBy: { createdAt: "asc" },
-      },
     },
   });
   if (!match) return NextResponse.json({ code: 404 }, { status: 404 });
-  const prefs = await prisma.userPreference.findUnique({ where: { userId: user.id } });
-  const threshold = prefs?.heartThreshold ?? 80;
   const latest = match.scores[0];
-  const starterTopics = extractStarterTopics(
-    match.messages.map((m) => ({ senderType: m.senderType, content: m.content })),
-    3
-  );
   return NextResponse.json({
     code: 0,
     data: {
@@ -44,12 +45,11 @@ export async function GET(
             lifeStoryScore: latest.lifeStoryScore,
             futureScore: latest.futureScore,
             summary: latest.summary,
+            matchReason: extractMatchReason(latest.reportJson, latest.summary),
             reportJson: latest.reportJson,
           }
         : null,
-      heartThreshold: threshold,
-      canUnlockChat: match.status === "connected" || (latest && latest.totalScore >= threshold),
-      starterTopics,
+      canUnlockChat: true,
     },
   });
 }

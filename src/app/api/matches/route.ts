@@ -3,6 +3,18 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getScheduleWindow } from "@/lib/matchSchedule";
 
+function extractMatchReason(reportJson?: string | null, summary?: string | null) {
+  if (reportJson) {
+    try {
+      const parsed = JSON.parse(reportJson) as { matchReason?: unknown };
+      if (typeof parsed.matchReason === "string" && parsed.matchReason.trim()) return parsed.matchReason;
+    } catch {
+      // ignore legacy report payloads
+    }
+  }
+  return summary ?? "";
+}
+
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ code: 401 }, { status: 401 });
@@ -17,8 +29,7 @@ export async function GET() {
   const prefs = await prisma.userPreference.findUnique({
     where: { userId: user.id },
   });
-  const threshold = prefs?.heartThreshold ?? 80;
-  const dailyMatchLimit = 6;
+  const dailyMatchLimit = 3;
   const schedule = getScheduleWindow({
     time: prefs?.dailyMatchTime ?? "21:00",
     timezone: prefs?.dailyMatchTimezone ?? "Asia/Shanghai",
@@ -36,8 +47,6 @@ export async function GET() {
   const list = await Promise.all(
     matches.map(async (m) => {
       const latest = m.scores[0];
-      const total = latest?.totalScore ?? 0;
-      const reached = total >= threshold;
       const lastReadAt = lastReadMap.get(m.id) ?? new Date(0);
       const unreadCount = await prisma.matchMessage.count({
         where: {
@@ -51,8 +60,7 @@ export async function GET() {
         id: m.id,
         status: m.status,
         targetUser: m.targetUser,
-        totalScore: latest ? total : null,
-        reachedThreshold: latest ? reached : false,
+        matchReason: latest ? extractMatchReason(latest.reportJson, latest.summary) : "",
         unreadCount,
         updatedAt: m.updatedAt.toISOString(),
       };
@@ -62,7 +70,6 @@ export async function GET() {
     code: 0,
     data: {
       list,
-      heartThreshold: threshold,
       dailyMatchLimit,
       dailyMatchTime: schedule.time,
       dailyMatchTimezone: schedule.timezone,
