@@ -89,48 +89,18 @@ export async function getCurrentUserWithToken(): Promise<{
   name: string | null;
   avatarUrl: string | null;
 } | null> {
-  const user = await getCurrentUser();
-  if (!user?.accessToken || !user.secondmeUserId) return null;
-  const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
-  if (!dbUser?.accessToken) return null;
-  let accessToken = dbUser.accessToken;
-  if (
-    dbUser.tokenExpiresAt &&
-    new Date() >= dbUser.tokenExpiresAt &&
-    dbUser.refreshToken &&
-    REFRESH_ENDPOINT &&
-    CLIENT_ID &&
-    CLIENT_SECRET
-  ) {
-    const body = new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: dbUser.refreshToken,
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
-    });
-    const res = await fetch(REFRESH_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: body.toString(),
-    });
-    const data = await res.json();
-    if (data.code === 0 && data.data?.accessToken) {
-      accessToken = data.data.accessToken;
-      const expiresAt = new Date(Date.now() + (data.data.expiresIn ?? 7200) * 1000);
-      await prisma.user.update({
-        where: { id: dbUser.id },
-        data: {
-          accessToken: data.data.accessToken,
-          refreshToken: data.data.refreshToken ?? dbUser.refreshToken,
-          tokenExpiresAt: expiresAt,
-        },
-      });
-    }
-  }
+  const sessionId = getSessionCookie();
+  if (!sessionId) return null;
+  const dbUser = await prisma.user.findUnique({ where: { id: sessionId } });
+  if (!dbUser?.accessToken || !dbUser.secondmeUserId) return null;
+
+  const tokenResult = await refreshAndReturnToken(dbUser);
+  if (!tokenResult) return null;
+
   return {
     id: dbUser.id,
     secondmeUserId: dbUser.secondmeUserId!,
-    accessToken,
+    accessToken: tokenResult.accessToken,
     name: dbUser.name,
     avatarUrl: dbUser.avatarUrl,
   };
@@ -151,6 +121,25 @@ export async function getUserWithTokenById(userId: string): Promise<{
   const dbUser = await prisma.user.findUnique({ where: { id: userId } });
   if (!dbUser?.accessToken || !dbUser.secondmeUserId) return null;
 
+  const tokenResult = await refreshAndReturnToken(dbUser);
+  if (!tokenResult) return null;
+
+  return {
+    id: dbUser.id,
+    secondmeUserId: dbUser.secondmeUserId!,
+    accessToken: tokenResult.accessToken,
+    name: dbUser.name,
+    avatarUrl: dbUser.avatarUrl,
+  };
+}
+
+async function refreshAndReturnToken(dbUser: {
+  id: string;
+  accessToken: string | null;
+  refreshToken: string | null;
+  tokenExpiresAt: Date | null;
+}): Promise<{ accessToken: string; userId: string } | null> {
+  if (!dbUser.accessToken) return null;
   let accessToken = dbUser.accessToken;
   if (
     dbUser.tokenExpiresAt &&
@@ -166,13 +155,11 @@ export async function getUserWithTokenById(userId: string): Promise<{
       client_id: CLIENT_ID,
       client_secret: CLIENT_SECRET,
     });
-
     const res = await fetch(REFRESH_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: body.toString(),
     });
-
     const data = await res.json().catch(() => null);
     if (data && data.code === 0 && data.data?.accessToken) {
       accessToken = data.data.accessToken;
@@ -187,12 +174,5 @@ export async function getUserWithTokenById(userId: string): Promise<{
       });
     }
   }
-
-  return {
-    id: dbUser.id,
-    secondmeUserId: dbUser.secondmeUserId!,
-    accessToken,
-    name: dbUser.name,
-    avatarUrl: dbUser.avatarUrl,
-  };
+  return { accessToken, userId: dbUser.id };
 }

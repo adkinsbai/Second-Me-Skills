@@ -5,19 +5,21 @@ import { buildDemoReport } from "@/lib/demoMatchReport";
 import { getScheduleWindow } from "@/lib/matchSchedule";
 import { runMatchPipeline } from "@/lib/matchPipeline";
 import { buildMatchStory, type UserWithPreference } from "@/lib/matchStory";
+import { preferenceSignalHits } from "@/lib/preferenceSignals";
 
-function normScore(v: number): number {
-  return Math.max(0, Math.min(100, Math.round(v)));
+const DAILY_MATCH_LIMIT = 3;
+
+function normScore(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
 }
 
 export async function POST() {
-  const DAILY_MATCH_LIMIT = 3;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ code: 401, message: "请先登录" }, { status: 401 });
 
   const dbUser = await prisma.user.findUnique({
     where: { id: user.id },
-    include: { preference: true },
+    include: { preference: true, preferenceSignal: true },
   });
   if (!dbUser) return NextResponse.json({ code: 404, message: "用户不存在" }, { status: 404 });
 
@@ -28,11 +30,12 @@ export async function POST() {
   const todayCount = await prisma.match.count({
     where: { userId: user.id, createdAt: { gte: schedule.todayStartUtc, lt: schedule.tomorrowStartUtc } },
   });
+
   if (todayCount >= DAILY_MATCH_LIMIT) {
     return NextResponse.json({
       code: 0,
       data: {
-        message: `今天的心动额度已经用完啦（${DAILY_MATCH_LIMIT}/${DAILY_MATCH_LIMIT}）～先去和喜欢的人聊聊，明天再来拆新盲盒叭！`,
+        message: `今天的匹配机会已经用完（${DAILY_MATCH_LIMIT}/${DAILY_MATCH_LIMIT}）。先和已有匹配聊聊，明天再来刷新。`,
         alreadyMatchedToday: true,
         pipeline: null,
       },
@@ -49,13 +52,12 @@ export async function POST() {
 
   const remainingSlots = Math.max(0, DAILY_MATCH_LIMIT - todayCount);
   const picks = ranked.slice(0, Math.min(1, remainingSlots));
-
   const finalStages = [
     ...stages,
     {
       id: "best_pick",
-      title: "本次最合适的人",
-      detail: "从排序结果里只保留当前最值得认识的一位",
+      title: "本轮最佳推荐",
+      detail: "从排序结果里保留当前最值得认识的一位。",
       count: picks.length,
     },
   ];
@@ -66,8 +68,8 @@ export async function POST() {
       data: {
         message:
           ranked.length === 0
-            ? "呜噜～当前样本里没有同时满足「双向心动设置」且合拍度足够的对象，可先完善资料/心动设置，或晚点再试。"
-            : "今天的匹配机会暂时不可用，请明天再试。",
+            ? "当前候选池里暂时没有同时满足双向偏好且合拍度足够的对象。可以先完善资料或放宽匹配偏好，稍后再试。"
+            : "今天暂时没有新的匹配机会，请晚点再试。",
         noQualifiedCandidates: true,
         pipeline: { stages: finalStages, dimensions, infoSources, searchedUserCount: stages[0]?.count ?? 0 },
       },
@@ -77,6 +79,7 @@ export async function POST() {
   const createdMatchIds: string[] = [];
   const selfWithPref = dbUser as UserWithPreference;
   const firstReason = buildMatchStory(selfWithPref, picks[0].candidate as UserWithPreference);
+
   for (const pick of picks) {
     const status = "connected";
     const outcome = "success";
@@ -84,23 +87,28 @@ export async function POST() {
     const lifeStoryScore = normScore((selfModel.dialogDepth + pick.targetModel.dialogDepth) / 2);
     const metrics = {
       totalScore: pick.scored.finalScore,
-      interestScore: normScore(
-        pick.scored.explain.vectorSimilarity * 100 * 0.65 + pick.scored.explain.rhythm * 0.35
-      ),
+      interestScore: normScore(pick.scored.explain.vectorSimilarity * 100 * 0.65 + pick.scored.explain.rhythm * 0.35),
       personalityScore: pick.scored.explain.emotion,
       valuesScore: pick.scored.explain.values,
       lifeStoryScore,
       futureScore: pick.scored.explain.attachment,
     };
     const demoReport = buildDemoReport(outcome);
+    const signalHits = preferenceSignalHits(dbUser.preferenceSignal, pick.candidate as UserWithPreference);
+    const preferenceReasons = signalHits.liked.map((tag) => `你之前对「${tag}」这类特征反馈更积极。`);
+    const modelReasons = [
+      pick.scored.explain.rhythm >= 75 ? "你们的沟通节奏接近，开始对话的阻力较低。" : "",
+      pick.scored.explain.values >= 75 ? "价值观模型显示你们在长期关系里的关键权重较接近。" : "",
+      pick.scored.explain.emotion >= 75 ? "情绪表达稳定度接近，适合逐步进入更真实的交流。" : "",
+    ].filter(Boolean);
     const mergedReport = {
       ...demoReport,
       matchExplain: pick.scored.explain,
       matchReason,
       recommendationReasons: [
-        "你们的生活线索里有可以彼此认出的光。",
-        "你们对关系与相处的期待，有机会从同一个方向开始生长。",
-        "丘比想让这次相遇不只是推荐，而像一个故事的第一句。",
+        ...preferenceReasons,
+        ...modelReasons,
+        "双方关系期待没有明显冲突，适合从轻量但真诚的对话开始。",
       ],
     };
     const match = await prisma.match.create({
@@ -122,6 +130,7 @@ export async function POST() {
     createdMatchIds.push(match.id);
   }
 
+  const matchedName = picks[0].candidate.name ?? "未设置昵称";
   return NextResponse.json({
     code: 0,
     data: {
@@ -136,7 +145,7 @@ export async function POST() {
         matchReason: firstReason,
         explain: picks[0].scored.explain,
       },
-      message: `叮咚！本次从候选池里选出了当前最合适的 1 位：${picks[0].candidate.name ?? "未设置昵称"}。今天还剩 ${Math.max(0, remainingSlots - 1)} 次匹配机会。`,
+      message: `已为你找到本轮最值得认识的人：${matchedName}。今天还剩 ${Math.max(0, remainingSlots - 1)} 次匹配机会。`,
       pipeline: { stages: finalStages, dimensions, infoSources, searchedUserCount: stages[0]?.count ?? 0 },
     },
   });

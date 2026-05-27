@@ -1,14 +1,12 @@
 "use client";
 
-import { useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 function OnboardingInner() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("return") || "/";
-
   const [privacy, setPrivacy] = useState(false);
   const [learn, setLearn] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -16,7 +14,7 @@ function OnboardingInner() {
 
   const finish = async () => {
     if (!privacy) {
-      setError("请先勾选同意隐私说明");
+      setError("请先阅读并同意隐私与数据说明。");
       return;
     }
     setSubmitting(true);
@@ -30,14 +28,14 @@ function OnboardingInner() {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || data?.code !== 0) {
-        setError(data?.message || "保存失败，请重试");
+        setError(data?.message || "保存失败，请重试。");
         setSubmitting(false);
         return;
       }
       const nextReturn = returnTo.startsWith("/") ? returnTo : "/";
       window.location.href = `/onboarding/paradise?return=${encodeURIComponent(nextReturn)}`;
     } catch {
-      setError("网络异常，请重试");
+      setError("网络异常，请重试。");
       setSubmitting(false);
     }
   };
@@ -46,55 +44,44 @@ function OnboardingInner() {
     <main className="page-shell px-4 py-10">
       <div className="glass-card mx-auto max-w-lg space-y-6 rounded-2xl p-6">
         <div>
-          <p className="text-xs uppercase tracking-[0.28em] text-gray-400">Welcome</p>
-          <h1 className="luxury-title mt-2 text-xl font-semibold">欢迎来到丘比</h1>
-          <p className="mt-2 text-sm leading-relaxed text-gray-500">
-            花 1 分钟了解我们在做什么：丘比会基于双方
-            <strong className="text-amber-100/95">真实资料与信息库</strong>判断合拍度，只把更值得认识的人带到你面前。匹配引擎会综合人格向量、沟通节奏、价值观等维度做推荐。
+          <p className="poster-kicker text-[var(--muted-ink)]">Welcome</p>
+          <h1 className="mt-2 text-3xl font-black text-[var(--ink)]">欢迎来到丘比</h1>
+          <p className="mt-3 text-sm font-bold leading-7 text-[var(--muted-ink)]">
+            丘比会基于你主动填写的资料、偏好和真实互动来理解合拍程度，只把更值得认识的人推荐给你。
           </p>
         </div>
 
-        <div className="luxury-alert luxury-alert-info text-sm">
-          <p className="font-medium">你将能使用</p>
+        <div className="luxury-alert luxury-alert-info text-sm font-bold">
+          <p className="font-black">你将能使用：</p>
           <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>心动设置与每日推荐（真实用户池匹配）</li>
-            <li>匹配后直接进入真人聊天、关系沉淀与对方主页</li>
-            <li>查看丘比写给你们的故事开场</li>
+            <li>每日匹配与翻牌发现</li>
+            <li>匹配后的真实聊天、关系沉淀与对方主页</li>
+            <li>丘比写给你们的合拍报告和开场建议</li>
           </ul>
         </div>
 
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
-          <input
-            type="checkbox"
-            className="mt-1 accent-amber-400"
-            checked={privacy}
-            onChange={(e) => setPrivacy(e.target.checked)}
-          />
+        <label className="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-[var(--ink)] bg-[var(--paper)] p-3 text-sm font-bold text-[var(--muted-ink)]">
+          <input type="checkbox" className="mt-1 accent-[var(--brand)]" checked={privacy} onChange={(event) => setPrivacy(event.target.checked)} />
           <span>
             我已阅读并同意
-            <Link href="/privacy" className="mx-1 text-[var(--brand-text)] underline underline-offset-2">
+            <Link href="/privacy" className="mx-1 font-black text-[var(--love)] underline underline-offset-2">
               《隐私与数据说明》
             </Link>
-            ：丘比会处理你主动填写的资料与聊天内容，用于匹配与产品改进；你可随时在设置中撤回授权。
+            。丘比会处理你主动填写的资料和互动内容，用于匹配与产品改进。
           </span>
         </label>
 
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-rose-400/25 bg-rose-950/25 p-3 text-sm text-gray-700">
-          <input type="checkbox" className="mt-1 accent-rose-400" checked={learn} onChange={(e) => setLearn(e.target.checked)} />
+        <label className="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-[var(--ink)] bg-[var(--paper-2)] p-3 text-sm font-bold text-[var(--muted-ink)]">
+          <input type="checkbox" className="mt-1 accent-[var(--love)]" checked={learn} onChange={(event) => setLearn(event.target.checked)} />
           <span>
-            允许我的专属 Agent <strong className="text-gray-900">学习我在真人聊天中的表达习惯与情绪方式</strong>（写入本地信息库，用于更懂我与更准匹配）。可随时关闭。
+            允许我的专属 Agent 学习我在真实聊天中的表达习惯和相处方式，用于更懂我和更准确的推荐。可后续关闭。
           </span>
         </label>
 
-        {error ? <p className="text-xs text-rose-300">{error}</p> : null}
+        {error ? <p className="text-sm font-black text-[var(--love)]">{error}</p> : null}
 
-        <button
-          type="button"
-          onClick={finish}
-          disabled={submitting}
-          className="luxury-btn w-full rounded-xl py-3 text-sm font-semibold disabled:opacity-60"
-        >
-          {submitting ? "保存中…" : "进入丘比"}
+        <button type="button" onClick={finish} disabled={submitting} className="luxury-btn w-full py-3 text-sm disabled:opacity-60">
+          {submitting ? "保存中..." : "进入丘比"}
         </button>
       </div>
     </main>
@@ -105,7 +92,9 @@ export default function OnboardingPage() {
   return (
     <Suspense
       fallback={
-        <main className="page-shell flex items-center justify-center text-sm luxury-subtitle">加载中…</main>
+        <main className="page-shell flex min-h-screen items-center justify-center text-sm font-black text-[var(--ink)]">
+          加载中...
+        </main>
       }
     >
       <OnboardingInner />

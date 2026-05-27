@@ -7,6 +7,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (process.env.NODE_ENV === 'production') return NextResponse.json({ code: 404, message: 'Not found' }, { status: 404 });
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ code: 401 }, { status: 401 });
   const { id: matchId } = await params;

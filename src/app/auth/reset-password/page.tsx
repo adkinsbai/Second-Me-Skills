@@ -15,7 +15,7 @@ function ResetPasswordInner() {
 
   const submit = async () => {
     if (!token) {
-      setError("链接无效，请重新获取");
+      setError("链接无效，请重新获取。");
       return;
     }
     if (!password) {
@@ -27,7 +27,7 @@ function ResetPasswordInner() {
       return;
     }
     if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
-      setError("密码至少 8 位，且包含字母和数字");
+      setError("密码至少 8 位，并包含字母和数字");
       return;
     }
     setLoading(true);
@@ -40,13 +40,10 @@ function ResetPasswordInner() {
         body: JSON.stringify({ token, password }),
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok || data?.code !== 0) {
-        setError(data?.message || "重置失败，请稍后重试");
-      } else {
-        setMessage(data?.message || "重置成功，请重新登录");
-      }
+      if (!res.ok || data?.code !== 0) setError(data?.message || "重置失败，请稍后再试。");
+      else setMessage(data?.message || "重置成功，请重新登录。");
     } catch {
-      setError("网络异常，请稍后重试");
+      setError("网络异常，请稍后再试。");
     } finally {
       setLoading(false);
     }
@@ -55,37 +52,20 @@ function ResetPasswordInner() {
   return (
     <main className="page-shell px-4 py-12">
       <div className="glass-card mx-auto w-full max-w-md space-y-4 rounded-2xl p-6">
-        <p className="text-xs uppercase tracking-[0.25em] text-gray-400">Password Reset</p>
-        <h1 className="luxury-title text-2xl font-semibold">重置密码</h1>
-        <p className="text-sm text-gray-500">请设置一个新密码，至少 8 位并包含字母和数字。</p>
+        <p className="poster-kicker text-[var(--muted-ink)]">Password Reset</p>
+        <h1 className="text-3xl font-black text-[var(--ink)]">重置密码</h1>
+        <p className="text-sm font-bold text-[var(--muted-ink)]">请设置一个至少 8 位、包含字母和数字的新密码。</p>
 
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="新密码"
-          className="luxury-input w-full rounded-xl px-3 py-2.5 text-sm"
-        />
-        <input
-          type="password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          placeholder="确认新密码"
-          className="luxury-input w-full rounded-xl px-3 py-2.5 text-sm"
-        />
-        {error ? <p className="text-xs text-rose-300">{error}</p> : null}
-        {message ? <p className="text-xs text-emerald-300">{message}</p> : null}
+        <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="新密码" className="luxury-input w-full px-3 py-2.5 text-sm" />
+        <input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="确认新密码" className="luxury-input w-full px-3 py-2.5 text-sm" />
+        {error ? <p className="text-sm font-black text-[var(--love)]">{error}</p> : null}
+        {message ? <p className="text-sm font-black text-[var(--ink)]">{message}</p> : null}
 
-        <button
-          type="button"
-          onClick={submit}
-          disabled={loading}
-          className="luxury-btn w-full rounded-xl py-3 text-sm font-semibold disabled:opacity-70"
-        >
-          {loading ? "提交中…" : "确认重置"}
+        <button type="button" onClick={submit} disabled={loading} className="luxury-btn w-full py-3 text-sm disabled:opacity-70">
+          {loading ? "提交中..." : "确认重置"}
         </button>
 
-        <Link href="/auth" className="inline-block text-xs text-gray-500 underline underline-offset-2">
+        <Link href="/auth" className="inline-block text-xs font-black text-[var(--muted-ink)] underline underline-offset-2">
           返回登录
         </Link>
       </div>
@@ -97,8 +77,8 @@ export default function ResetPasswordPage() {
   return (
     <Suspense
       fallback={
-        <main className="page-shell flex items-center justify-center text-sm luxury-subtitle">
-          页面加载中…
+        <main className="page-shell flex min-h-screen items-center justify-center text-sm font-black text-[var(--ink)]">
+          页面加载中...
         </main>
       }
     >

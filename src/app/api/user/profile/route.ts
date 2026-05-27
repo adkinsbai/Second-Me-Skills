@@ -27,6 +27,6 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  return NextResponse.json({ code: 0 });
+  return NextResponse.json({ code: 0, message: "保存成功" });
 }
 

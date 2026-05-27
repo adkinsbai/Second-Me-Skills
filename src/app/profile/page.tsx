@@ -4,11 +4,19 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 
-type UserInfo = { name: string; avatar: string; bio: string; shortId: string | null; photos: string[] };
+type UserInfo = {
+  name: string;
+  avatar: string;
+  bio: string;
+  shortId: string | null;
+  photos: string[];
+};
 
 export default function ProfilePage() {
   const [info, setInfo] = useState<UserInfo | null>(null);
-  const [name, setName] = useState(""); const [bio, setBio] = useState(""); const [avatarUrl, setAvatarUrl] = useState("");
+  const [name, setName] = useState("");
+  const [bio, setBio] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
   const [photoSlots, setPhotoSlots] = useState<(string | null)[]>([null, null, null]);
   const [saving, setSaving] = useState(false);
   const [tip, setTip] = useState<{ msg: string; ok: boolean } | null>(null);
@@ -16,156 +24,183 @@ export default function ProfilePage() {
   const refs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
 
   useEffect(() => {
-    fetch("/api/user/info").then(r => r.json()).then(res => {
-      if (res?.code === 0 && res?.data) {
-        const d = res.data as UserInfo;
-        setInfo(d); setName(d.name ?? ""); setBio(d.bio ?? ""); setAvatarUrl(d.avatar ?? "");
-        const s: (string | null)[] = [null, null, null];
-        (d.photos ?? []).slice(0, 3).forEach((p, i) => { s[i] = p || null; });
-        setPhotoSlots(s);
-      }
-    }).catch(() => null).finally(() => setLoading(false));
+    fetch("/api/user/info")
+      .then((response) => response.json())
+      .then((result) => {
+        if (result?.code === 0 && result?.data) {
+          const data = result.data as UserInfo;
+          setInfo(data);
+          setName(data.name ?? "");
+          setBio(data.bio ?? "");
+          setAvatarUrl(data.avatar ?? "");
+          const slots: (string | null)[] = [null, null, null];
+          (data.photos ?? []).slice(0, 3).forEach((photo, index) => {
+            slots[index] = photo || null;
+          });
+          setPhotoSlots(slots);
+        }
+      })
+      .catch(() => null)
+      .finally(() => setLoading(false));
   }, []);
 
-  const handleFile = async (idx: number, files: FileList | null) => {
+  const handleFile = async (index: number, files: FileList | null) => {
     if (!files?.length) return;
-    const f = files[0];
-    if (f.size > 200 * 1024) { setTip({ msg: "图片超过 200KB，请换一张", ok: false }); return; }
-    const url = await new Promise<string>((res, rej) => {
-      const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(); r.readAsDataURL(f);
+    const file = files[0];
+    if (file.size > 200 * 1024) {
+      setTip({ msg: "图片超过 200KB，请换一张更小的图。", ok: false });
+      return;
+    }
+    const url = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error("read file failed"));
+      reader.readAsDataURL(file);
     });
-    setPhotoSlots(p => { const n = [...p]; n[idx] = url; return n; });
+    setPhotoSlots((prev) => {
+      const next = [...prev];
+      next[index] = url;
+      return next;
+    });
   };
 
   const save = async () => {
-    setSaving(true); setTip(null);
+    setSaving(true);
+    setTip(null);
     try {
-      const [photo1, photo2, photo3] = photoSlots.map(p => p ?? null);
-      const res = await fetch("/api/user/profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, bio, avatarUrl, photo1, photo2, photo3 }) });
+      const [photo1, photo2, photo3] = photoSlots.map((photo) => photo ?? null);
+      const res = await fetch("/api/user/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, bio, avatarUrl, photo1, photo2, photo3 }),
+      });
       const data = await res.json().catch(() => null);
-      if (!res.ok || data?.code !== 0) setTip({ msg: data?.message || "保存失败", ok: false });
-      else { setTip({ msg: "已保存", ok: true }); setInfo(p => p ? { ...p, name, bio, avatar: avatarUrl } : p); }
-    } catch { setTip({ msg: "网络异常", ok: false }); } finally { setSaving(false); }
+      if (!res.ok || data?.code !== 0) {
+        setTip({ msg: data?.message || "保存失败", ok: false });
+      } else {
+        setTip({ msg: "已保存", ok: true });
+        setInfo((prev) => (prev ? { ...prev, name, bio, avatar: avatarUrl } : prev));
+      }
+    } catch {
+      setTip({ msg: "网络异常，请稍后再试", ok: false });
+    } finally {
+      setSaving(false);
+    }
   };
 
-  if (loading) return (
-    <div className="page-shell flex min-h-screen items-center justify-center">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-[var(--brand)]" />
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="page-shell flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--ink)] border-t-[var(--brand)]" />
+      </div>
+    );
+  }
 
   return (
     <div className="page-shell min-h-screen">
-      <AppHeader backHref="/matches" title="个人主页" />
+      <AppHeader backHref="/matches" title="个人资料" />
 
-      <div className="mx-auto max-w-[780px] space-y-5 px-4 py-6">
-
-        {/* 用户卡 */}
-        <div className="poster-panel flex items-center gap-4 overflow-hidden p-5">
-          <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl ring-2 ring-[var(--brand)]/30"
-            style={{ boxShadow: "0 0 20px rgba(29,255,143,0.15)" }}>
-            <div className="absolute inset-0 bg-gradient-to-br from-[var(--brand)] to-teal-500" />
+      <main className="mx-auto max-w-[780px] space-y-5 px-4 py-6">
+        <section className="poster-panel flex items-center gap-4 overflow-hidden p-5">
+          <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-2 border-[var(--ink)] bg-[var(--brand)] shadow-[5px_5px_0_var(--ink)]">
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={avatarUrl} alt="" className="absolute inset-0 h-full w-full object-cover" referrerPolicy="no-referrer" />
+              <img src={avatarUrl} alt={name || 'user avatar'} className="absolute inset-0 h-full w-full object-cover" referrerPolicy="no-referrer" />
             ) : (
-              <div className="absolute inset-0 flex items-center justify-center text-3xl font-black text-black">
+              <div className="absolute inset-0 flex items-center justify-center text-3xl font-black text-[var(--ink)]">
                 {(name?.[0] ?? "?").toUpperCase()}
               </div>
             )}
           </div>
-          <div>
-            <p className="text-xl font-black tracking-tight text-white">{name || "未设置昵称"}</p>
-            {info?.shortId && (
-              <p className="mt-1 inline-flex items-center gap-1 rounded-full border border-[var(--border-mid)] bg-[var(--surface-2)] px-2.5 py-0.5 text-xs font-mono text-[var(--fg-4)]">
-                <span className="text-[var(--brand)]">#</span>{info.shortId}
+          <div className="min-w-0">
+            <p className="poster-kicker">Profile</p>
+            <h1 className="truncate text-2xl font-black text-[var(--paper)]">{name || "未设置昵称"}</h1>
+            {info?.shortId ? (
+              <p className="mt-1 inline-flex items-center gap-1 rounded-full border-2 border-[var(--ink)] bg-[var(--brand)] px-2.5 py-0.5 text-xs font-black text-[var(--ink)]">
+                #{info.shortId}
               </p>
-            )}
+            ) : null}
           </div>
-        </div>
+        </section>
 
-        {/* 照片区 */}
-        <div className="glass-card rounded-3xl p-5">
-          <p className="mb-1 text-sm font-bold text-white">我的照片</p>
-          <p className="mb-4 text-xs text-[var(--fg-4)]">最多 3 张 · 每张 ≤ 200 KB</p>
+        <section className="glass-card rounded-3xl p-5">
+          <p className="mb-1 text-sm font-black text-[var(--ink)]">我的照片</p>
+          <p className="mb-4 text-xs font-bold text-[var(--muted-ink)]">最多 3 张，每张不超过 200KB。正式上线后会升级为云存储上传。</p>
           <div className="grid grid-cols-3 gap-3">
-            {[0, 1, 2].map(idx => (
-              <div key={idx} className="relative aspect-square">
-                <button type="button" onClick={() => refs[idx].current?.click()}
-                  className={`h-full w-full overflow-hidden rounded-2xl border transition active:scale-95 ${
-                    photoSlots[idx]
-                      ? "border-[var(--border-mid)]"
-                      : "border-dashed border-[var(--border-mid)] bg-[var(--surface-2)] hover:border-[var(--brand)] hover:bg-[var(--brand-light)]"
-                  }`}>
-                  {photoSlots[idx] ? (
+            {[0, 1, 2].map((index) => (
+              <div key={index} className="relative aspect-square">
+                <button
+                  type="button"
+                  onClick={() => refs[index].current?.click()}
+                  className={`h-full w-full overflow-hidden rounded-2xl border-2 border-[var(--ink)] transition active:scale-95 ${
+                    photoSlots[index] ? "bg-[var(--paper)]" : "border-dashed bg-[var(--paper-2)] hover:bg-[var(--brand)]"
+                  }`}
+                >
+                  {photoSlots[index] ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={photoSlots[idx]!} alt="" className="h-full w-full object-cover" />
+                    <img src={photoSlots[index]!} alt={`photo ${index + 1}`} className="h-full w-full object-cover" />
                   ) : (
-                    <div className="flex h-full w-full flex-col items-center justify-center gap-1">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-mid)] bg-[var(--surface-3)] text-2xl font-light text-[var(--fg-4)]">+</div>
-                      <span className="text-[10px] text-[var(--fg-4)]">上传</span>
+                    <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-[var(--ink)]">
+                      <span className="text-3xl font-black">+</span>
+                      <span className="text-xs font-black">上传</span>
                     </div>
                   )}
                 </button>
-                {photoSlots[idx] && (
-                  <button type="button"
-                    onClick={e => { e.stopPropagation(); setPhotoSlots(p => { const n=[...p]; n[idx]=null; return n; }); if (refs[idx].current) refs[idx].current!.value=""; }}
-                    className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/70 text-[11px] text-white hover:bg-[var(--love)]">×</button>
-                )}
-                <input ref={refs[idx]} type="file" accept="image/*" className="hidden" onChange={e => handleFile(idx, e.target.files)} />
+                {photoSlots[index] ? (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setPhotoSlots((prev) => {
+                        const next = [...prev];
+                        next[index] = null;
+                        return next;
+                      });
+                      if (refs[index].current) refs[index].current.value = "";
+                    }}
+                    className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-[var(--ink)] bg-[var(--love)] text-sm font-black text-white"
+                    aria-label="删除照片"
+                  >
+                    ×
+                  </button>
+                ) : null}
+                <input ref={refs[index]} type="file" accept="image/*" className="hidden" onChange={(event) => handleFile(index, event.target.files)} />
               </div>
             ))}
           </div>
-        </div>
+        </section>
 
-        {/* 表单 */}
-        <div className="glass-card rounded-3xl p-5 space-y-4">
-          <p className="text-sm font-bold text-white">基本资料</p>
+        <section className="glass-card space-y-4 rounded-3xl p-5">
+          <p className="text-sm font-black text-[var(--ink)]">基本资料</p>
           <label className="block">
-            <span className="mb-1.5 block text-xs font-medium text-[var(--fg-4)]">昵称</span>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="你的昵称" className="luxury-input w-full px-4 py-3 text-sm" />
+            <span className="mb-1.5 block text-xs font-black text-[var(--muted-ink)]">昵称</span>
+            <input value={name} onChange={(event) => setName(event.target.value)} placeholder="你的昵称" className="luxury-input w-full px-4 py-3 text-sm" />
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-xs font-medium text-[var(--fg-4)]">头像 URL（可选）</span>
-            <input value={avatarUrl} onChange={e => setAvatarUrl(e.target.value)} placeholder="https://example.com/avatar.jpg" className="luxury-input w-full px-4 py-3 text-sm" />
+            <span className="mb-1.5 block text-xs font-black text-[var(--muted-ink)]">头像 URL（可选）</span>
+            <input value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} placeholder="https://example.com/avatar.jpg" className="luxury-input w-full px-4 py-3 text-sm" />
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-xs font-medium text-[var(--fg-4)]">一句话介绍</span>
-            <textarea value={bio} onChange={e => setBio(e.target.value)} rows={3} placeholder="简单介绍自己" className="luxury-input w-full px-4 py-3 text-sm" />
+            <span className="mb-1.5 block text-xs font-black text-[var(--muted-ink)]">一句话介绍</span>
+            <textarea value={bio} onChange={(event) => setBio(event.target.value)} rows={3} placeholder="简单介绍自己" className="luxury-input w-full px-4 py-3 text-sm" />
           </label>
+        </section>
+
+        <div className="flex items-center justify-between gap-3">
+          {tip ? <span className={`text-sm font-black ${tip.ok ? "text-[var(--ink)]" : "text-[var(--love)]"}`}>{tip.msg}</span> : <span />}
+          <button type="button" onClick={save} disabled={saving} className="luxury-btn px-7 py-2.5 text-sm disabled:opacity-40">
+            {saving ? "保存中..." : "保存资料"}
+          </button>
         </div>
 
-        <div className="flex items-center justify-between">
-          {tip ? (
-            <span className={`text-sm ${tip.ok ? "text-[var(--brand)]" : "text-[var(--love)]"}`}>{tip.ok ? "✓ " : ""}{tip.msg}</span>
-          ) : <span />}
-          <button type="button" onClick={save} disabled={saving}
-            className="luxury-btn px-7 py-2.5 text-sm disabled:opacity-40">{saving ? "保存中…" : "保存资料"}</button>
-        </div>
-
-        {/* 答题入口 */}
-        <Link
-          href="/onboarding/questionnaire"
-          className="glass-card group flex items-center justify-between overflow-hidden rounded-3xl p-5 transition hover:-translate-y-1"
-          style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)" }}
-        >
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--brand-light)] text-2xl">
-              📋
-            </div>
-            <div>
-              <p className="font-bold text-white">完善我的档案</p>
-              <p className="mt-0.5 text-sm text-[var(--fg-4)]">回答几个问题，让丘比更了解你</p>
-            </div>
+        <Link href="/onboarding/questionnaire" className="glass-card group flex items-center justify-between rounded-3xl p-5 transition hover:-translate-y-1">
+          <div>
+            <p className="font-black text-[var(--ink)]">完善我的档案</p>
+            <p className="mt-1 text-sm font-bold text-[var(--muted-ink)]">回答几个问题，让丘比更准确地理解你的关系偏好。</p>
           </div>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
-            className="shrink-0 text-[var(--fg-4)] transition group-hover:translate-x-0.5 group-hover:text-[var(--brand)]">
-            <path d="M6 12l4-4-4-4" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+          <span className="rounded-xl border-2 border-[var(--ink)] bg-[var(--brand)] px-3 py-1 text-xs font-black text-[var(--ink)] shadow-[3px_3px_0_var(--ink)]">进入</span>
         </Link>
-
-        <div className="h-8" />
-      </div>
+      </main>
     </div>
   );
 }

@@ -8,6 +8,11 @@ function extractMatchReason(report: Record<string, unknown> | null, summary: str
   return typeof reason === "string" && reason.trim() ? reason : summary;
 }
 
+function stringList(value: unknown, limit = 5) {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0).slice(0, limit);
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -50,12 +55,12 @@ export async function GET(
 
   const expectationNote =
     score.personalityScore >= 75
-      ? "你们性格匹配度较高，但仍建议真人阶段确认作息与生活节奏。"
-      : "你们聊天氛围尚可，建议先用轻量话题继续校准相处节奏。";
+      ? "你们的表达方式和相处节奏初步合拍，但仍建议在真人聊天里确认作息、回复频率和生活安排。"
+      : "你们的聊天氛围还有观察空间，建议先用轻量话题继续校准相处节奏。";
   const riskNote =
     score.valuesScore >= 70
-      ? "兴趣重合度不错，重点留意边界与承诺节奏是否一致。"
-      : "价值观仍有不确定项，真人阶段建议优先聊长期关系与冲突处理方式。";
+      ? "当前没有明显价值观冲突，重点留意边界、承诺节奏和线下安排是否一致。"
+      : "价值观仍有不确定项，真人阶段建议优先聊长期关系期待和冲突处理方式。";
 
   const rawExplain = report?.matchExplain as
     | { rhythm?: number; emotion?: number; values?: number; attachment?: number; vectorSimilarity?: number }
@@ -74,6 +79,7 @@ export async function GET(
         .filter((x): x is string => typeof x === "string")
         .slice(0, 6)
     : [];
+  const starterTopics = stringList(report?.starterTopics, 6);
 
   return NextResponse.json({
     code: 0,
@@ -93,6 +99,7 @@ export async function GET(
       actionPlan,
       relationshipProgress: progress,
       dateSuggestion,
+      starterTopics,
       matchExplain,
       recommendationReasons,
       relationshipNotes: {

@@ -24,14 +24,14 @@ export function UserProfileEditor() {
 
   useEffect(() => {
     fetch("/api/user/info")
-      .then((r) => r.json())
-      .then((res) => {
-        if (res?.code === 0 && res?.data) {
-          setInfo(res.data as UserInfo);
-          setName(res.data.name ?? "");
-          setBio(res.data.bio ?? "");
-          setAvatarUrl(res.data.avatar ?? "");
-          setPhotos(Array.isArray(res.data.photos) ? res.data.photos : []);
+      .then((response) => response.json())
+      .then((result) => {
+        if (result?.code === 0 && result?.data) {
+          setInfo(result.data as UserInfo);
+          setName(result.data.name ?? "");
+          setBio(result.data.bio ?? "");
+          setAvatarUrl(result.data.avatar ?? "");
+          setPhotos(Array.isArray(result.data.photos) ? result.data.photos : []);
         }
       })
       .catch(() => null)
@@ -56,41 +56,26 @@ export function UserProfileEditor() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, bio, avatarUrl, photo1, photo2, photo3 }),
       });
-
       const data = await res.json().catch(() => null);
       if (!res.ok || data?.code !== 0) {
-        setTip(data?.message || "保存失败，请稍后重试");
+        setTip(data?.message || "保存失败，请稍后再试。");
         return;
       }
 
-      const nextPhotos = [photo1, photo2, photo3].filter(
-        (x): x is string => typeof x === "string" && x.trim().length > 0
-      );
+      const nextPhotos = [photo1, photo2, photo3].filter((item): item is string => typeof item === "string" && item.trim().length > 0);
       setPhotos(nextPhotos);
-      setInfo((prev) =>
-        prev
-          ? {
-              ...prev,
-              name,
-              bio,
-              avatar: avatarUrl,
-              selfIntroduction: bio,
-              photos: nextPhotos,
-            }
-          : prev
-      );
-
+      setInfo((prev) => (prev ? { ...prev, name, bio, avatar: avatarUrl, selfIntroduction: bio, photos: nextPhotos } : prev));
       setTip("已保存");
       setEditing(false);
       setSelectedPhotoDataUrls([]);
     } catch {
-      setTip("网络异常，请稍后重试");
+      setTip("网络异常，请稍后再试。");
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) return <div className="text-sm text-gray-500">加载中...</div>;
+  if (loading) return <div className="text-sm font-bold text-[var(--muted-ink)]">加载中...</div>;
   if (!info) return null;
 
   return (
@@ -98,91 +83,63 @@ export function UserProfileEditor() {
       <div className="flex items-center gap-3">
         {info.avatar ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={info.avatar} alt="" className="h-12 w-12 rounded-full object-cover ring-2 ring-gray-200" />
+          <img src={info.avatar} alt="" className="h-12 w-12 rounded-2xl border-2 border-[var(--ink)] object-cover shadow-[3px_3px_0_var(--ink)]" />
         ) : null}
-        <div>
-          <p className="font-medium text-gray-900">{info.name ?? "未设置昵称"}</p>
-          {info.bio ? <p className="text-sm text-gray-400">{info.bio}</p> : null}
+        <div className="min-w-0">
+          <p className="truncate font-black text-[var(--ink)]">{info.name ?? "未设置昵称"}</p>
+          {info.bio ? <p className="truncate text-sm font-bold text-[var(--muted-ink)]">{info.bio}</p> : null}
         </div>
-        <button
-          type="button"
-          onClick={() => setEditing((v) => !v)}
-          className="luxury-btn-secondary ml-auto rounded-xl px-3 py-1 text-xs"
-        >
+        <button type="button" onClick={() => setEditing((value) => !value)} className="luxury-btn-secondary ml-auto px-3 py-1 text-xs">
           {editing ? "取消" : "编辑资料"}
         </button>
       </div>
 
-      {info.selfIntroduction ? (
-        <p className="mt-3 text-sm text-gray-600">{info.selfIntroduction}</p>
-      ) : null}
+      {info.selfIntroduction ? <p className="mt-3 text-sm font-bold text-[var(--muted-ink)]">{info.selfIntroduction}</p> : null}
 
       {editing ? (
-        <div className="mt-4 space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-3">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="昵称"
-            className="luxury-input w-full rounded-xl px-3 py-2 text-sm"
-          />
-          <input
-            value={avatarUrl}
-            onChange={(e) => setAvatarUrl(e.target.value)}
-            placeholder="头像 URL（可选）"
-            className="luxury-input w-full rounded-xl px-3 py-2 text-sm"
-          />
-          <textarea
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            rows={3}
-            placeholder="一句自我介绍"
-            className="luxury-input w-full rounded-xl px-3 py-2 text-sm"
-          />
+        <div className="mt-4 space-y-3 rounded-xl border-2 border-[var(--ink)] bg-[var(--paper-2)] p-3">
+          <input value={name} onChange={(event) => setName(event.target.value)} placeholder="昵称" className="luxury-input w-full px-3 py-2 text-sm" />
+          <input value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} placeholder="头像 URL（可选）" className="luxury-input w-full px-3 py-2 text-sm" />
+          <textarea value={bio} onChange={(event) => setBio(event.target.value)} rows={3} placeholder="一句自我介绍" className="luxury-input w-full px-3 py-2 text-sm" />
 
-          <div className="space-y-2 rounded-xl border border-gray-200 bg-gray-100 p-3">
+          <div className="space-y-2 rounded-xl border-2 border-[var(--ink)] bg-[var(--paper)] p-3">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-medium text-gray-700">可选：上传 3 张照片</p>
-              <span className="text-[11px] text-gray-400">建议小图（不超过 200KB/张）</span>
+              <p className="text-xs font-black text-[var(--ink)]">可选：上传 3 张照片</p>
+              <span className="text-[11px] font-bold text-[var(--muted-ink)]">建议每张不超过 200KB</span>
             </div>
-
             <input
               type="file"
               accept="image/*"
               multiple
-              onChange={async (e) => {
-                const files = Array.from(e.target.files ?? []);
+              onChange={async (event) => {
+                const files = Array.from(event.target.files ?? []).slice(0, 3);
                 if (files.length === 0) return;
-
-                const selected = files.slice(0, 3);
-                const MAX_BYTES = 200 * 1024;
-                for (const f of selected) {
-                  if (f.size > MAX_BYTES) {
-                    alert("图片有点大啦，请换一张不超过 200KB 的小图");
+                for (const file of files) {
+                  if (file.size > 200 * 1024) {
+                    alert("图片有点大，请换一张不超过 200KB 的小图。");
                     return;
                   }
                 }
-
                 const urls = await Promise.all(
-                  selected.map(
-                    (f) =>
+                  files.map(
+                    (file) =>
                       new Promise<string>((resolve, reject) => {
-                        const r = new FileReader();
-                        r.onload = () => resolve(String(r.result));
-                        r.onerror = () => reject(new Error("read file failed"));
-                        r.readAsDataURL(f);
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(String(reader.result));
+                        reader.onerror = () => reject(new Error("read file failed"));
+                        reader.readAsDataURL(file);
                       })
                   )
                 );
                 setSelectedPhotoDataUrls(urls);
               }}
             />
-
-            {!!previewPhotos.length ? (
+            {previewPhotos.length > 0 ? (
               <div className="grid grid-cols-3 gap-2">
-                {previewPhotos.slice(0, 3).map((p, idx) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <div key={idx} className="h-20 w-full overflow-hidden rounded-lg bg-gray-100 ring-1 ring-gray-200">
-                    <img src={p} alt={`photo-${idx}`} className="h-full w-full object-cover" />
+                {previewPhotos.slice(0, 3).map((photo, index) => (
+                  <div key={index} className="h-20 w-full overflow-hidden rounded-lg border-2 border-[var(--ink)] bg-[var(--paper)]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={photo} alt={`photo-${index}`} className="h-full w-full object-cover" />
                   </div>
                 ))}
               </div>
@@ -190,15 +147,8 @@ export function UserProfileEditor() {
           </div>
 
           <div className="flex items-center justify-between">
-            <span className={`text-xs ${tip === "已保存" ? "text-emerald-300" : "text-rose-300"}`}>
-              {tip}
-            </span>
-            <button
-              type="button"
-              onClick={saveProfile}
-              disabled={saving}
-              className="luxury-btn rounded-xl px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
-            >
+            <span className={`text-xs font-black ${tip === "已保存" ? "text-[var(--ink)]" : "text-[var(--love)]"}`}>{tip}</span>
+            <button type="button" onClick={saveProfile} disabled={saving} className="luxury-btn px-3 py-1.5 text-xs disabled:opacity-60">
               {saving ? "保存中..." : "保存"}
             </button>
           </div>
@@ -207,4 +157,3 @@ export function UserProfileEditor() {
     </div>
   );
 }
-

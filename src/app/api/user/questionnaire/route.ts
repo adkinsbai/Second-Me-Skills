@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value
+        .map((item) => String(item).trim())
+        .filter(Boolean)
+        .slice(0, 20)
+    : [];
+}
+
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
@@ -9,39 +18,47 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const answers = body?.answers;
   if (!answers || typeof answers !== "object") {
-    return NextResponse.json({ code: 400, message: "缺少答题数据" }, { status: 400 });
+    return NextResponse.json({ code: 400, message: "缺少问卷数据" }, { status: 400 });
   }
 
-  // Extract structured fields from answers for direct DB columns
+  const answerMap = answers as Record<string, unknown>;
   const updateData: Record<string, unknown> = {
-    profileAnswers: answers,
+    profileAnswers: answerMap,
     onboardingDone: true,
   };
 
-  if (answers.gender) updateData.gender = String(answers.gender);
-  if (answers.age) {
-    const age = Number(answers.age);
+  if (answerMap.gender) updateData.gender = String(answerMap.gender);
+  if (answerMap.age) {
+    const age = Number(answerMap.age);
     if (age >= 16 && age <= 99) updateData.age = age;
   }
-  if (answers.bio) updateData.bio = String(answers.bio).slice(0, 300);
+  if (answerMap.bio) updateData.bio = String(answerMap.bio).slice(0, 300);
 
   await prisma.user.update({
     where: { id: user.id },
     data: updateData,
   });
 
-  // Also upsert user preference from answers
-  if (answers.lookingFor || answers.expectedGender) {
+  const activityTags = stringArray(answerMap.interests);
+  const sparks = stringArray(answerMap.sparks);
+  const matchTypes = [
+    ...(answerMap.lookingFor ? [String(answerMap.lookingFor)] : []),
+    ...sparks,
+  ];
+
+  if (matchTypes.length || answerMap.expectedGender || activityTags.length) {
     await prisma.userPreference.upsert({
       where: { userId: user.id },
       create: {
         userId: user.id,
-        expectedGender: answers.expectedGender ?? null,
-        matchTypes: answers.lookingFor ? JSON.stringify([answers.lookingFor]) : null,
+        expectedGender: answerMap.expectedGender ? String(answerMap.expectedGender) : "any",
+        matchTypes: matchTypes.length ? JSON.stringify(matchTypes) : null,
+        activityTags: activityTags.length ? JSON.stringify(activityTags) : null,
       },
       update: {
-        ...(answers.expectedGender ? { expectedGender: String(answers.expectedGender) } : {}),
-        ...(answers.lookingFor ? { matchTypes: JSON.stringify([answers.lookingFor]) } : {}),
+        ...(answerMap.expectedGender ? { expectedGender: String(answerMap.expectedGender) } : {}),
+        ...(matchTypes.length ? { matchTypes: JSON.stringify(matchTypes) } : {}),
+        ...(activityTags.length ? { activityTags: JSON.stringify(activityTags) } : {}),
       },
     });
   }

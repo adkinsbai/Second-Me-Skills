@@ -30,7 +30,8 @@ export async function GET(request: NextRequest) {
 
   const savedState = getOauthStateCookie();
   if (savedState && state !== savedState) {
-    console.warn("OAuth state 验证失败，可能是跨 WebView 场景");
+    clearOauthStateCookie();
+    return NextResponse.redirect(new URL('/auth?error=oauth_state_mismatch', request.url));
   }
   clearOauthStateCookie();
 

@@ -4,7 +4,14 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
-import type { DemoDimensionBlock } from "@/lib/demoMatchReport";
+
+type DimensionBlock = {
+  summary: string;
+  facets: { label: string; observation: string }[];
+  bullets: string[];
+  caution: string;
+  nextStep: string;
+};
 
 type ReportData = {
   targetUser: { name: string | null; avatarUrl: string | null; bio: string | null };
@@ -19,7 +26,7 @@ type ReportData = {
   report: Record<string, unknown> | null;
   consistencyPrediction?: {
     score: number;
-    level: "高" | "中" | "低";
+    level: string;
     overlapRate: number;
     contradictions: number;
     hint: string;
@@ -41,13 +48,20 @@ type ReportData = {
   recommendationReasons?: string[];
 };
 
-const DIMENSIONS = [
-  { key: "interestScore", label: "兴趣爱好", reportKey: "interest" },
-  { key: "personalityScore", label: "性格 / MBTI", reportKey: "personality" },
-  { key: "valuesScore", label: "价值观 / 人生观", reportKey: "values" },
-  { key: "lifeStoryScore", label: "人生经历", reportKey: "lifeStory" },
-  { key: "futureScore", label: "对未来的期许", reportKey: "future" },
-] as const;
+type ScoreKey =
+  | "interestScore"
+  | "personalityScore"
+  | "valuesScore"
+  | "lifeStoryScore"
+  | "futureScore";
+
+const DIMENSIONS: Array<{ key: ScoreKey; label: string; reportKey: string; tone: string }> = [
+  { key: "interestScore", label: "兴趣与日常", reportKey: "interest", tone: "bg-[#C7FF00]" },
+  { key: "personalityScore", label: "性格与表达", reportKey: "personality", tone: "bg-[#FFE500]" },
+  { key: "valuesScore", label: "价值观", reportKey: "values", tone: "bg-[#FF2D8D] text-white" },
+  { key: "lifeStoryScore", label: "生活经历", reportKey: "lifeStory", tone: "bg-[#174BFF] text-white" },
+  { key: "futureScore", label: "未来节奏", reportKey: "future", tone: "bg-[#FFFDF2]" },
+];
 
 function isFacet(x: unknown): x is { label: string; observation: string } {
   if (typeof x !== "object" || x === null) return false;
@@ -55,32 +69,38 @@ function isFacet(x: unknown): x is { label: string; observation: string } {
   return typeof o.label === "string" && typeof o.observation === "string";
 }
 
-/** 兼容旧版 string-only reportJson */
-function parseDimension(raw: unknown): DemoDimensionBlock | null {
+function parseDimension(raw: unknown): DimensionBlock | null {
   if (raw == null) return null;
   if (typeof raw === "string") {
-    return {
-      summary: raw,
-      facets: [],
-      bullets: [],
-      caution: "",
-      nextStep: "",
-    };
+    return { summary: raw, facets: [], bullets: [], caution: "", nextStep: "" };
   }
-  if (typeof raw === "object" && raw !== null && "summary" in raw) {
-    const o = raw as Record<string, unknown>;
-    if (typeof o.summary !== "string") return null;
-    return {
-      summary: o.summary,
-      facets: Array.isArray(o.facets) ? o.facets.filter(isFacet) : [],
-      bullets: Array.isArray(o.bullets)
-        ? o.bullets.filter((b): b is string => typeof b === "string")
-        : [],
-      caution: typeof o.caution === "string" ? o.caution : "",
-      nextStep: typeof o.nextStep === "string" ? o.nextStep : "",
-    };
-  }
-  return null;
+  if (typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  if (typeof o.summary !== "string") return null;
+  return {
+    summary: o.summary,
+    facets: Array.isArray(o.facets) ? o.facets.filter(isFacet) : [],
+    bullets: Array.isArray(o.bullets)
+      ? o.bullets.filter((b): b is string => typeof b === "string")
+      : [],
+    caution: typeof o.caution === "string" ? o.caution : "",
+    nextStep: typeof o.nextStep === "string" ? o.nextStep : "",
+  };
+}
+
+function asScore(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? Math.round(value) : null;
+}
+
+function explainRows(data: ReportData) {
+  if (!data.matchExplain) return [];
+  return [
+    ["聊天节奏", data.matchExplain.rhythm],
+    ["情绪回应", data.matchExplain.emotion],
+    ["价值重合", data.matchExplain.values],
+    ["关系期待", data.matchExplain.attachment],
+    ["资料相似", data.matchExplain.vectorSimilarity],
+  ].map(([label, value]) => ({ label: String(label), value: asScore(value) ?? 0 }));
 }
 
 export default function ReportPage() {
@@ -91,262 +111,314 @@ export default function ReportPage() {
 
   useEffect(() => {
     if (!id) return;
+    let alive = true;
+    setLoading(true);
     fetch(`/api/matches/${id}/report`)
       .then((r) => r.json())
       .then((d) => {
+        if (!alive) return;
         if (d.code === 0) setData(d.data);
-        setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {})
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
   }, [id]);
 
-  if (loading || !data) {
+  if (loading) {
     return (
-      <main className="page-shell app-container py-10">
-        <p className="text-sm text-gray-500">加载中…</p>
+      <main className="page-shell">
+        <AppHeader backHref={`/matches/${id}`} title="合拍报告" />
+        <div className="app-container py-10">
+          <div className="glass-card p-6 text-sm font-semibold">丘比正在整理你们的合拍线索...</div>
+        </div>
       </main>
     );
   }
 
-  const hasReason = Boolean(data.matchReason || data.summary);
+  if (!data) {
+    return (
+      <main className="page-shell">
+        <AppHeader backHref={`/matches/${id}`} title="合拍报告" />
+        <div className="app-container py-10">
+          <div className="glass-card space-y-3 p-6">
+            <p className="text-lg font-black">报告暂时没有生成</p>
+            <p className="text-sm leading-6 luxury-subtitle">
+              可以先回到匹配详情页，继续完善资料或发起对话，丘比会在信息更充分后补全报告。
+            </p>
+            <Link href={`/matches/${id}`} className="luxury-btn inline-flex px-4 py-2 text-sm">
+              返回匹配详情
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  const totalScore = asScore(data.totalScore);
   const executiveBrief =
     data.report && typeof data.report.executiveBrief === "string" ? data.report.executiveBrief : null;
-  const consistency = data.consistencyPrediction;
+  const lead = data.matchReason ?? data.summary ?? executiveBrief;
+  const explain = explainRows(data);
 
   return (
     <main className="page-shell">
-      <AppHeader backHref={`/matches/${id}`} title="丘比写给你们的话" />
-      <div className="app-container max-w-2xl space-y-6 py-8">
-        <div className="glass-card rounded-2xl p-6">
-          <div className="flex items-center gap-4">
-            {data.targetUser.avatarUrl && (
-              <img
-                src={data.targetUser.avatarUrl}
-                alt=""
-                className="h-16 w-16 rounded-full object-cover ring-2 ring-amber-200/30"
-              />
-            )}
-            <div>
-              <p className="font-medium text-gray-900">{data.targetUser.name ?? "对方"}</p>
-              {hasReason ? (
-                <>
-                  <p className="mt-3 text-sm leading-relaxed text-gray-600">{data.matchReason ?? data.summary}</p>
-                  {executiveBrief && (
-                    <div className="luxury-alert luxury-alert-info mt-4 text-sm leading-relaxed">
-                      <span className="font-medium">丘比总览 · </span>
-                      {executiveBrief}
-                    </div>
-                  )}
-                </>
+      <AppHeader backHref={`/matches/${id}`} title="合拍报告" />
+      <div className="app-container max-w-3xl space-y-7 py-8">
+        <section className="poster-panel overflow-hidden">
+          <div className="poster-stripe h-4 border-b-2 border-[var(--ink)]" />
+          <div className="grid gap-5 p-5 sm:grid-cols-[auto_1fr] sm:p-6">
+            <div className="h-24 w-24 overflow-hidden rounded-[1.2rem] border-2 border-[var(--paper)] bg-[#FFE500] shadow-[5px_5px_0_#F7F2E8]">
+              {data.targetUser.avatarUrl ? (
+                <img src={data.targetUser.avatarUrl} alt="" className="h-full w-full object-cover" />
               ) : (
-                <p className="luxury-subtitle">暂无匹配原因，匹配成功后将在此展示</p>
+                <div className="flex h-full w-full items-center justify-center text-3xl font-black text-[var(--ink)]">
+                  {(data.targetUser.name ?? "对方").trim()[0] ?? "Q"}
+                </div>
               )}
             </div>
+            <div>
+              <p className="poster-kicker">Qiubi Match Report</p>
+              <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <h1 className="text-3xl font-black leading-tight text-[var(--paper)] sm:text-4xl">
+                    {data.targetUser.name ?? "对方"}
+                  </h1>
+                  <p className="mt-2 max-w-xl text-sm leading-6 text-[rgba(247,242,232,.74)]">
+                    {lead ?? "丘比还在等待更多互动线索，暂时先保留这个合拍席位。"}
+                  </p>
+                </div>
+                {totalScore !== null && (
+                  <div className="rounded-[1rem] border-2 border-[var(--paper)] bg-[#C7FF00] px-5 py-3 text-center text-[var(--ink)] shadow-[5px_5px_0_#F7F2E8]">
+                    <p className="text-xs font-black uppercase">Score</p>
+                    <p className="text-4xl font-black">{totalScore}</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
 
-        {!hasReason && (
-          <p className="text-center text-sm text-gray-500">
-            <Link href={`/matches/${id}`} className="text-[var(--brand-text)] underline underline-offset-2">
-              返回匹配详情
-            </Link>
-          </p>
+        {executiveBrief && executiveBrief !== lead && (
+          <section className="luxury-alert luxury-alert-info leading-7">
+            <span className="font-black">丘比总览：</span>
+            {executiveBrief}
+          </section>
         )}
 
-        {hasReason && (
-          <div className="space-y-5">
-            {consistency && (
-              <div
-                className={`rounded-2xl border p-4 ${
-                  consistency.score < 60
-                    ? "border-red-400/35 bg-red-950/35 text-rose-50"
-                    : consistency.score < 75
-                      ? "border-amber-400/35 bg-amber-950/25 text-gray-900"
-                      : "border-emerald-400/35 bg-emerald-950/30 text-emerald-50"
-                }`}
-              >
-                <p className="text-sm font-semibold">
-                  真人一致性预测：{consistency.level}
-                </p>
-                <p className="mt-1 text-sm text-gray-600">{consistency.hint}</p>
+        <section className="grid gap-3 sm:grid-cols-5">
+          {DIMENSIONS.map((item) => {
+            const score = asScore(data[item.key]);
+            return (
+              <div key={item.key} className={`rounded-2xl border-2 border-[var(--ink)] p-3 shadow-[4px_4px_0_var(--ink)] ${item.tone}`}>
+                <p className="text-xs font-black">{item.label}</p>
+                <p className="mt-2 text-2xl font-black">{score ?? "--"}</p>
+              </div>
+            );
+          })}
+        </section>
+
+        {data.consistencyPrediction && (
+          <section className="glass-card grid gap-4 p-5 sm:grid-cols-[auto_1fr]">
+            <div className="rounded-2xl border-2 border-[var(--ink)] bg-[#FFE500] px-5 py-4 text-center shadow-[4px_4px_0_var(--ink)]">
+              <p className="text-xs font-black">真人一致性</p>
+              <p className="text-3xl font-black">{asScore(data.consistencyPrediction.score) ?? "--"}</p>
+              <p className="text-xs font-black">{data.consistencyPrediction.level}</p>
+            </div>
+            <div className="text-sm leading-7">
+              <p className="font-black">预测提示</p>
+              <p className="luxury-subtitle">{data.consistencyPrediction.hint}</p>
+              <p className="mt-2 text-xs font-bold luxury-subtitle">
+                资料重合 {Math.round(data.consistencyPrediction.overlapRate * 100)}% / 需要留意的差异{" "}
+                {data.consistencyPrediction.contradictions} 处
+              </p>
+            </div>
+          </section>
+        )}
+
+        {!!explain.length && (
+          <section className="glass-card p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="poster-kicker">Signals</p>
+                <h2 className="mt-3 text-xl font-black">丘比看到的线索</h2>
+              </div>
+              {!!data.recommendationReasons?.length && (
+                <p className="max-w-sm text-sm leading-6 luxury-subtitle">{data.recommendationReasons[0]}</p>
+              )}
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-5">
+              {explain.map((row) => (
+                <div key={row.label} className="rounded-xl border-2 border-[var(--ink)] bg-[#FFFDF2] p-3">
+                  <p className="text-xs font-black">{row.label}</p>
+                  <div className="mt-3 h-2 rounded-full border border-[var(--ink)] bg-white">
+                    <div className="h-full rounded-full bg-[#FF2D8D]" style={{ width: `${Math.min(100, Math.max(0, row.value))}%` }} />
+                  </div>
+                  <p className="mt-2 text-sm font-black">{row.value}</p>
+                </div>
+              ))}
+            </div>
+            {!!data.recommendationReasons?.slice(1).length && (
+              <ul className="mt-4 grid gap-2 text-sm leading-6 sm:grid-cols-2">
+                {data.recommendationReasons.slice(1, 5).map((item) => (
+                  <li key={item} className="rounded-xl border-2 border-[var(--ink)] bg-[#C7FF00] px-3 py-2 font-bold">
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
+
+        <section className="space-y-4">
+          {DIMENSIONS.map(({ key, label, reportKey, tone }) => {
+            const dim = parseDimension(data.report?.[reportKey]);
+            const score = asScore(data[key]);
+            return (
+              <article key={key} className="glass-card p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-lg font-black">{label}</h2>
+                  <span className={`rounded-full border-2 border-[var(--ink)] px-3 py-1 text-sm font-black shadow-[3px_3px_0_var(--ink)] ${tone}`}>
+                    {score !== null ? `${score}/100` : "待补充"}
+                  </span>
+                </div>
+
+                {dim ? (
+                  <div className="mt-4 space-y-4 text-sm leading-7">
+                    <p className="luxury-subtitle">{dim.summary}</p>
+                    {!!dim.facets.length && (
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {dim.facets.map((facet) => (
+                          <div key={facet.label} className="rounded-xl border-2 border-[var(--ink)] bg-[#FFFDF2] px-3 py-2">
+                            <p className="font-black">{facet.label}</p>
+                            <p className="luxury-subtitle">{facet.observation}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {!!dim.bullets.length && (
+                      <ul className="space-y-2">
+                        {dim.bullets.map((bullet) => (
+                          <li key={bullet} className="rounded-xl border-2 border-[var(--ink)] bg-[#FFE500] px-3 py-2 font-bold">
+                            {bullet}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {dim.caution && (
+                      <div className="luxury-alert luxury-alert-error leading-6">
+                        <span className="font-black">留意：</span>
+                        {dim.caution}
+                      </div>
+                    )}
+                    {dim.nextStep && (
+                      <div className="luxury-alert luxury-alert-info leading-6">
+                        <span className="font-black">下一步：</span>
+                        {dim.nextStep}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm luxury-subtitle">这个维度还没有足够线索，继续互动后会更准确。</p>
+                )}
+              </article>
+            );
+          })}
+        </section>
+
+        {(data.expectationNote || data.riskNote) && (
+          <section className="grid gap-4 sm:grid-cols-2">
+            {data.expectationNote && (
+              <div className="glass-card p-5">
+                <p className="poster-kicker">Expectation</p>
+                <p className="mt-3 text-sm leading-7 luxury-subtitle">{data.expectationNote}</p>
               </div>
             )}
-
-            {(data.expectationNote || data.riskNote) && (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {data.expectationNote && (
-                  <div className="glass-card rounded-2xl p-4">
-                    <p className="text-xs font-medium uppercase tracking-wide text-gray-400">预期管理</p>
-                    <p className="mt-1 text-sm leading-relaxed text-gray-600">{data.expectationNote}</p>
-                  </div>
-                )}
-                {data.riskNote && (
-                  <div className="rounded-2xl border border-amber-400/35 bg-amber-950/25 p-4">
-                    <p className="text-xs font-medium uppercase tracking-wide text-[var(--brand-text)]/80">风险提示</p>
-                    <p className="mt-1 text-sm leading-relaxed text-amber-50/95">{data.riskNote}</p>
-                  </div>
-                )}
+            {data.riskNote && (
+              <div className="luxury-alert luxury-alert-error leading-7">
+                <p className="font-black">需要提前说清楚</p>
+                <p className="mt-1">{data.riskNote}</p>
               </div>
             )}
+          </section>
+        )}
 
-            {data.matchExplain && (
-              <div className="glass-card rounded-2xl border border-violet-400/25 p-4">
-                <p className="text-sm font-semibold text-violet-100">丘比看见的火花</p>
-                <p className="mt-2 text-sm leading-6 text-violet-100/85">
-                  丘比不是把你们压成分数，而是在资料、城市、职业、兴趣和关系期待里寻找那些会让人心里一颤的重合。下面这些句子，是它从你们的生活线索里读到的火花。
-                </p>
-                {!!data.recommendationReasons?.length && (
-                  <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-violet-100/90">
-                    {data.recommendationReasons.slice(0, 4).map((x, i) => (
-                      <li key={i}>{x}</li>
+        {data.relationshipProgress && (
+          <section className="glass-card p-5">
+            <h2 className="text-lg font-black">关系进度</h2>
+            <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
+              {data.relationshipProgress.steps.map((step, index) => {
+                const active = index <= data.relationshipProgress!.current;
+                return (
+                  <span
+                    key={step}
+                    className={`whitespace-nowrap rounded-full border-2 border-[var(--ink)] px-3 py-1 text-sm font-black shadow-[3px_3px_0_var(--ink)] ${
+                      active ? "bg-[#C7FF00]" : "bg-[#FFFDF2]"
+                    }`}
+                  >
+                    {step}
+                  </span>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {!!data.actionPlan?.length && (
+          <section className="glass-card p-5">
+            <p className="poster-kicker">Action</p>
+            <h2 className="mt-3 text-xl font-black">下一步行动</h2>
+            <ul className="mt-4 space-y-2 text-sm leading-6">
+              {data.actionPlan.map((item, index) => (
+                <li key={item} className="rounded-xl border-2 border-[var(--ink)] bg-[#C7FF00] px-3 py-2 font-bold">
+                  {index + 1}. {item}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {!!data.starterTopics?.length && (
+          <section className="glass-card p-5">
+            <p className="poster-kicker">Openers</p>
+            <h2 className="mt-3 text-xl font-black">开场话题</h2>
+            <ul className="mt-4 grid gap-2 text-sm leading-6 sm:grid-cols-2">
+              {data.starterTopics.map((topic) => (
+                <li key={topic} className="rounded-xl border-2 border-[var(--ink)] bg-[#FFE500] px-3 py-2 font-bold">
+                  {topic}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {(data.dateSuggestion || data.relationshipNotes) && (
+          <section className="grid gap-4 sm:grid-cols-2">
+            {data.dateSuggestion && (
+              <div className="glass-card p-5">
+                <p className="poster-kicker">Date</p>
+                <p className="mt-3 text-sm leading-7 luxury-subtitle">{data.dateSuggestion}</p>
+              </div>
+            )}
+            {data.relationshipNotes && (
+              <div className="glass-card p-5">
+                <p className="poster-kicker">Memory</p>
+                {!!data.relationshipNotes.memories?.length && (
+                  <ul className="mt-3 space-y-2 text-sm leading-6 luxury-subtitle">
+                    {data.relationshipNotes.memories.slice(0, 3).map((item) => (
+                      <li key={item}>{item}</li>
                     ))}
                   </ul>
                 )}
-              </div>
-            )}
-
-            {DIMENSIONS.map(({ key, label, reportKey }) => {
-              const dim = parseDimension(data.report?.[reportKey]);
-              return (
-                <div key={key} className="glass-card rounded-2xl p-5">
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="text-base font-semibold text-gray-900">{label}</span>
-                  </div>
-
-                  {dim && (
-                    <div className="mt-4 space-y-4 text-sm text-gray-600">
-                      <div>
-                        <p className="text-xs font-medium uppercase tracking-wide text-gray-400">维度综述</p>
-                        <p className="mt-1 leading-relaxed">{dim.summary}</p>
-                      </div>
-
-                      {dim.facets.length > 0 && (
-                        <div>
-                          <p className="text-xs font-medium uppercase tracking-wide text-gray-400">细分观察</p>
-                          <ul className="mt-2 grid gap-2 sm:grid-cols-2">
-                            {dim.facets.map((f) => (
-                              <li
-                                key={f.label}
-                                className="rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 leading-snug"
-                              >
-                                <span className="font-medium text-gray-900">{f.label}</span>
-                                <span className="text-gray-500"> — {f.observation}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {dim.bullets.length > 0 && (
-                        <div>
-                          <p className="text-xs font-medium uppercase tracking-wide text-gray-400">对话证据与推论</p>
-                          <ul className="mt-2 list-inside list-disc space-y-1.5 text-gray-500">
-                            {dim.bullets.map((b, i) => (
-                              <li key={i} className="leading-relaxed">
-                                {b}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {dim.caution ? (
-                        <div className="rounded-lg border border-amber-400/35 bg-amber-950/30 px-3 py-2 text-amber-50/95">
-                          <span className="font-medium text-[var(--brand-text)]">风险提示 · </span>
-                          {dim.caution}
-                        </div>
-                      ) : null}
-
-                      {dim.nextStep ? (
-                        <div className="luxury-alert luxury-alert-info px-3 py-2">
-                          <span className="font-medium">建议下一步 · </span>
-                          {dim.nextStep}
-                        </div>
-                      ) : null}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            {data.relationshipProgress && (
-              <div className="glass-card rounded-2xl p-4">
-                <p className="text-sm font-semibold text-gray-900">关系进度条</p>
-                <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1">
-                  {data.relationshipProgress.steps.map((s, i) => {
-                    const active = i <= data.relationshipProgress!.current;
-                    return (
-                      <div key={s} className="flex items-center gap-2">
-                        <span
-                          className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ${
-                            active
-                              ? "border border-amber-400/45 bg-amber-400/15 text-gray-900"
-                              : "luxury-chip-muted"
-                          }`}
-                        >
-                          {s}
-                        </span>
-                        {i < data.relationshipProgress!.steps.length - 1 && (
-                          <span className="text-amber-100/30">→</span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {!!data.actionPlan?.length && (
-              <div className="luxury-alert luxury-alert-info">
-                <p className="text-sm font-semibold">下一步行动指南（3 选 1 立刻执行）</p>
-                <ul className="mt-2 list-inside list-disc space-y-1 text-sm">
-                  {data.actionPlan!.map((a, i) => (
-                    <li key={i}>{a}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {!!data.starterTopics?.length && (
-              <div className="glass-card rounded-2xl border border-indigo-400/25 p-4">
-                <p className="text-sm font-semibold text-indigo-100">真人开场话题包</p>
-                <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-indigo-100/85">
-                  {data.starterTopics!.map((t, i) => (
-                    <li key={i}>{t}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {data.dateSuggestion && (
-              <div className="glass-card rounded-2xl border border-fuchsia-400/25 p-4">
-                <p className="text-sm font-semibold text-fuchsia-100">约会建议</p>
-                <p className="mt-1 text-sm text-fuchsia-100/85">{data.dateSuggestion}</p>
-              </div>
-            )}
-
-            {data.relationshipNotes && (
-              <div className="glass-card rounded-2xl p-4">
-                <p className="text-sm font-semibold text-gray-900">关系沉淀</p>
-                {!!data.relationshipNotes.memories?.length && (
-                  <div className="mt-2">
-                    <p className="text-xs uppercase tracking-wide text-gray-400">重要对话片段</p>
-                    <ul className="mt-1 list-inside list-disc space-y-1 text-sm text-gray-600">
-                      {data.relationshipNotes.memories.slice(0, 3).map((m, i) => (
-                        <li key={i}>{m}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
                 {data.relationshipNotes.nextPlan && (
-                  <p className="mt-2 text-sm text-gray-600">
-                    <span className="font-medium text-gray-900">下一步计划：</span>
-                    {data.relationshipNotes.nextPlan}
-                  </p>
+                  <p className="mt-3 text-sm font-bold">{data.relationshipNotes.nextPlan}</p>
                 )}
               </div>
             )}
-          </div>
+          </section>
         )}
       </div>
     </main>

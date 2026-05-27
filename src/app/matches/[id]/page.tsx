@@ -27,32 +27,30 @@ export default function MatchDetailPage() {
   useEffect(() => {
     if (!id) return;
     fetch(`/api/matches/${id}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.code === 0) setDetail(d.data);
-        else if (d.code === 404) router.replace("/matches");
-        setLoading(false);
+      .then((response) => response.json())
+      .then((result) => {
+        if (result.code === 0) setDetail(result.data);
+        else if (result.code === 404) router.replace("/matches");
       })
-      .catch(() => setLoading(false));
+      .catch(() => null)
+      .finally(() => setLoading(false));
   }, [id, router]);
 
   const unlock = () => {
     setUnlocking(true);
     fetch(`/api/matches/${id}/unlock`, { method: "POST" })
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.code === 0) {
-          setDetail((prev) => (prev ? { ...prev, status: "connected", canUnlockChat: true } : null));
-        }
-        setUnlocking(false);
+      .then((response) => response.json())
+      .then((result) => {
+        if (result.code === 0) setDetail((prev) => (prev ? { ...prev, status: "connected", canUnlockChat: true } : null));
       })
-      .catch(() => setUnlocking(false));
+      .catch(() => null)
+      .finally(() => setUnlocking(false));
   };
 
   if (loading || !detail) {
     return (
-      <main className="page-shell app-container py-10">
-        <p className="text-sm text-gray-500">加载中…</p>
+      <main className="page-shell flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--ink)] border-t-[var(--brand)]" />
       </main>
     );
   }
@@ -61,92 +59,80 @@ export default function MatchDetailPage() {
     <main className="page-shell">
       <AppHeader backHref="/matches" title={detail.targetUser.name ?? "匹配详情"} />
       <div className="app-container max-w-2xl space-y-6 py-8">
-        <div className="glass-card flex gap-4 rounded-2xl p-4">
-          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-amber-400/20 to-sky-400/15 ring-1 ring-gray-200">
+        <section className="poster-panel flex gap-4 p-5">
+          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-2 border-[var(--ink)] bg-[var(--brand)] shadow-[5px_5px_0_var(--ink)]">
             {detail.targetUser.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img src={detail.targetUser.avatarUrl} alt="" className="h-full w-full object-cover" />
             ) : (
-              <div className="flex h-full w-full items-center justify-center text-2xl text-[var(--brand-text)]/50">
+              <div className="flex h-full w-full items-center justify-center text-2xl font-black text-[var(--ink)]">
                 {detail.targetUser.name?.[0] ?? "?"}
               </div>
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="font-medium text-gray-900">{detail.targetUser.name ?? "未设置昵称"}</p>
-            <p className="text-sm text-gray-500">{detail.targetUser.bio ?? "—"}</p>
-            {detail.latestScore && (
-              <p className="mt-2 text-sm leading-6 text-gray-600">{detail.latestScore.matchReason}</p>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <div className="glass-card rounded-2xl p-4 text-gray-500">
-            <span className="font-medium text-gray-900">真实匹配</span>
-            <p className="mt-1 text-sm">
-              丘比会根据双方资料、偏好和信息库做真实用户匹配；匹配后直接进入真人聊天。
+            <p className="poster-kicker">Matched User</p>
+            <h1 className="truncate text-2xl font-black text-[var(--paper)]">{detail.targetUser.name ?? "未设置昵称"}</h1>
+            <p className="mt-2 text-sm font-bold leading-6 text-[var(--paper)]/80">
+              {detail.targetUser.bio ?? "TA 还没有填写简介。"}
             </p>
           </div>
+        </section>
+
+        {detail.latestScore ? (
+          <section className="glass-card p-5">
+            <p className="poster-kicker text-[var(--muted-ink)]">Match Reason</p>
+            <h2 className="mt-2 text-xl font-black text-[var(--ink)]">丘比为什么推荐 TA</h2>
+            <p className="mt-3 text-sm font-bold leading-7 text-[var(--muted-ink)]">{detail.latestScore.matchReason}</p>
+          </section>
+        ) : (
+          <section className="glass-card p-5">
+            <h2 className="text-xl font-black text-[var(--ink)]">匹配报告准备中</h2>
+            <p className="mt-2 text-sm font-bold text-[var(--muted-ink)]">
+              生成匹配后，这里会展示推荐理由和下一步建议。
+            </p>
+          </section>
+        )}
+
+        <div className="grid gap-3">
           {detail.latestScore ? (
-            <Link
-              href={`/matches/${id}/report`}
-              className="glass-card block rounded-2xl p-4 text-left transition hover:border-amber-200/45"
-            >
-              <span className="font-medium text-gray-900">丘比写给你们的话</span>
-              <p className="text-sm text-gray-500">{detail.latestScore.summary}</p>
+            <Link href={`/matches/${id}/report`} className="glass-card block p-5 transition hover:-translate-y-1">
+              <p className="font-black text-[var(--ink)]">查看合拍报告</p>
+              <p className="mt-1 text-sm font-bold text-[var(--muted-ink)]">{detail.latestScore.summary}</p>
             </Link>
-          ) : (
-            <div className="glass-card rounded-2xl p-4 text-gray-400">
-              <span className="font-medium text-gray-700">丘比写给你们的话</span>
-              <p className="text-sm">匹配生成后即可查看这段故事开场</p>
-            </div>
-          )}
+          ) : null}
+
           {detail.status === "connected" ? (
-            <div className="space-y-3">
-              <Link
-                href={`/matches/${id}/chat`}
-                className="glass-card block rounded-2xl border border-rose-400/25 p-4 text-left transition hover:border-rose-400/45"
-              >
-                <span className="font-medium text-rose-100">与对方聊天</span>
-                <p className="text-sm text-rose-200/80">已解锁，去和 TA 说句话吧</p>
+            <>
+              <Link href={`/matches/${id}/chat`} className="glass-card block border-2 border-[var(--ink)] bg-[var(--brand)] p-5 text-left shadow-[5px_5px_0_var(--ink)] transition hover:-translate-y-1">
+                <p className="font-black text-[var(--ink)]">和 TA 聊天</p>
+                <p className="mt-1 text-sm font-bold text-[var(--ink)]/75">
+                  已连接，可以直接进入真实聊天。
+                </p>
               </Link>
-              <Link
-                href={`/matches/${id}/relationship`}
-                className="glass-card block rounded-2xl border border-indigo-400/25 p-4 text-left transition hover:border-indigo-400/45"
-              >
-                <span className="font-medium text-indigo-100">关系沉淀页</span>
-                <p className="text-sm text-indigo-200/75">记录共同记忆、兴趣与下一步计划</p>
+              <Link href={`/matches/${id}/relationship`} className="glass-card block p-5 transition hover:-translate-y-1">
+                <p className="font-black text-[var(--ink)]">关系沉淀</p>
+                <p className="mt-1 text-sm font-bold text-[var(--muted-ink)]">
+                  查看共同记忆、话题建议和下一步计划。
+                </p>
               </Link>
-              <Link
-                href={`/users/${detail.targetUser.id}`}
-                className="glass-card block rounded-2xl border border-emerald-400/25 p-4 text-left transition hover:border-emerald-400/45"
-              >
-                <span className="font-medium text-emerald-100">进入对方主页</span>
-                <p className="text-sm text-emerald-200/75">查看 TA 的照片与自我介绍</p>
+              <Link href={`/users/${detail.targetUser.id}`} className="glass-card block p-5 transition hover:-translate-y-1">
+                <p className="font-black text-[var(--ink)]">查看 TA 的主页</p>
+                <p className="mt-1 text-sm font-bold text-[var(--muted-ink)]">
+                  了解照片、简介和公开资料。
+                </p>
               </Link>
-              <div className="glass-card rounded-2xl border border-sky-400/20 p-4">
-                <p className="text-sm font-medium text-sky-100">真人开场话题包（可直接用）</p>
-                <ul className="mt-2 space-y-1 text-sm text-sky-100/80">
-                  {["先聊今天一个小日常，再问 TA 最近最开心的一件事。", "从你们都提到的兴趣切入，问“最近最想做的一件小事”。", "先确认聊天节奏：你喜欢高频还是慢热？"].map((t, i) => (
-                    <li key={i}>- {t}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
+            </>
           ) : detail.canUnlockChat ? (
-            <button
-              type="button"
-              onClick={unlock}
-              disabled={unlocking}
-              className="luxury-btn block w-full rounded-2xl p-4 text-left text-sm font-semibold disabled:opacity-50"
-            >
-              {unlocking ? "准备中…" : "点击开始与对方聊天"}
+            <button type="button" onClick={unlock} disabled={unlocking} className="luxury-btn w-full rounded-2xl p-4 text-left text-sm disabled:opacity-50">
+              {unlocking ? "正在准备聊天入口..." : "开始和 TA 聊天"}
             </button>
           ) : (
-            <div className="glass-card rounded-2xl p-4 text-gray-400">
-              <span className="font-medium text-gray-700">与对方聊天</span>
-              <p className="text-sm">正在准备聊天入口</p>
-              <p className="mt-1 text-xs text-rose-200/80">准备好后可看更多真实资料与话题建议。</p>
+            <div className="glass-card p-5">
+              <p className="font-black text-[var(--ink)]">聊天入口准备中</p>
+              <p className="mt-1 text-sm font-bold text-[var(--muted-ink)]">
+                准备好后，你就能查看更多资料并开始聊天。
+              </p>
             </div>
           )}
         </div>

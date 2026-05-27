@@ -5,8 +5,7 @@ function authorized(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return process.env.NODE_ENV !== "production";
   const auth = request.headers.get("authorization") ?? "";
-  const querySecret = request.nextUrl.searchParams.get("secret") ?? "";
-  return auth === `Bearer ${secret}` || querySecret === secret;
+  return auth === `Bearer ${secret}`;
 }
 
 export async function GET(request: NextRequest) {

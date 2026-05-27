@@ -1,10 +1,12 @@
 "use client";
 
 import {
-  useEffect,
-  useState,
-  useRef,
+  type ChangeEvent,
+  type KeyboardEvent,
   useCallback,
+  useEffect,
+  useRef,
+  useState,
   useTransition,
 } from "react";
 import { useParams } from "next/navigation";
@@ -16,19 +18,41 @@ import {
   ChatTimeDivider,
   type BubbleMsg,
 } from "@/components/ChatBubble";
+import { IMAGE_DATA_PREFIX } from "@/lib/utils";
 
-// ─── Time label helpers ────────────────────────────────────────────────
+const PAGE_SIZE = 40;
+
+const EMOJI_ROWS = [
+  ["😊", "😂", "🥰", "😍", "🤭", "😎", "🤝", "🥺", "😮", "🫶"],
+  ["❤️", "💗", "💛", "💚", "💙", "💜", "✨", "🔥", "🌙", "☀️"],
+  ["👍", "👏", "🙌", "🙏", "💪", "✌️", "👋", "👌", "🎉", "🍀"],
+  ["🍜", "☕", "🎬", "🎧", "📚", "✈️", "🏖️", "🚲", "🌃", "🎮"],
+];
+
+type GuidanceData = {
+  openerSuggestions: string[];
+  nextActions: string[];
+  reflectionPrompts: string[];
+  relationshipProgress: { steps: string[]; current: number };
+  dateSuggestion?: string;
+  messageCount: number;
+};
+
 function fmtTime(iso: string) {
   const d = new Date(iso);
-  const now = new Date();
-  const diffDays = Math.floor(
-    (now.setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / 86400000
-  );
+  if (Number.isNaN(d.getTime())) return "";
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const msgDay = new Date(d);
+  msgDay.setHours(0, 0, 0, 0);
+  const diffDays = Math.floor((today.getTime() - msgDay.getTime()) / 86400000);
   const hhmm = d.toLocaleTimeString("zh-CN", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
   });
+
   if (diffDays === 0) return hhmm;
   if (diffDays === 1) return `昨天 ${hhmm}`;
   if (diffDays < 7) {
@@ -40,24 +64,14 @@ function fmtTime(iso: string) {
 
 function needsDivider(prev: BubbleMsg | undefined, cur: BubbleMsg): boolean {
   if (!prev) return true;
-  return (
-    new Date(cur.createdAt).getTime() -
-      new Date(prev.createdAt).getTime() >
-    5 * 60 * 1000
-  );
+  return new Date(cur.createdAt).getTime() - new Date(prev.createdAt).getTime() > 5 * 60 * 1000;
 }
 
-// ─── Emoji panel data ──────────────────────────────────────────────────
-const EMOJI_ROWS = [
-  ["😊", "😂", "🥰", "😍", "🤩", "😎", "🥺", "😭", "😡", "🤔"],
-  ["❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "💔", "💕"],
-  ["👍", "👎", "👏", "🙌", "🤝", "✌️", "🤞", "👋", "🙏", "💪"],
-  ["🌹", "🌸", "🌺", "✨", "🎉", "🎊", "🔥", "⭐", "🌙", "☀️"],
-  ["🍕", "🍜", "🍣", "🍦", "🎧", "🎮", "📚", "✈️", "🏖️", "⛰️"],
-];
-
-// ─── Load more page size ───────────────────────────────────────────────
-const PAGE_SIZE = 40;
+function sortedMessages(messages: BubbleMsg[]) {
+  return [...messages].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
+}
 
 export default function HumanChatPage() {
   const params = useParams();
@@ -70,179 +84,163 @@ export default function HumanChatPage() {
   const [sending, setSending] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
-  const [selectedImageDataUrl, setSelectedImageDataUrl] = useState<
-    string | null
-  >(null);
+  const [selectedImageDataUrl, setSelectedImageDataUrl] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [typingVisible, setTypingVisible] = useState(false);
+  const [guidance, setGuidance] = useState<GuidanceData | null>(null);
+  const [guidanceLoading, setGuidanceLoading] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   const [, startTransition] = useTransition();
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const sseShouldReconnect = useRef(true);
   const sseRef = useRef<EventSource | null>(null);
-  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingIdRef = useRef(0);
+  const lastCreatedAtRef = useRef<string | null>(null);
 
-  // ─── Scroll to bottom ─────────────────────────────────────────────
+  const rememberLast = useCallback((items: BubbleMsg[]) => {
+    if (items.length) lastCreatedAtRef.current = items[items.length - 1].createdAt;
+  }, []);
+
   const scrollToBottom = useCallback((smooth = true) => {
-    bottomRef.current?.scrollIntoView({
-      behavior: smooth ? "smooth" : "instant",
-    });
+    bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
   }, []);
 
-  // ─── Merge messages (de-dup by id) ────────────────────────────────
-  const mergeMessages = useCallback((incoming: BubbleMsg[]) => {
-    setMessages((prev) => {
-      const map = new Map(prev.map((m) => [m.id, m]));
-      for (const m of incoming) {
-        map.set(m.id, m);
-      }
-      return Array.from(map.values()).sort(
-        (a, b) =>
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-      );
-    });
-  }, []);
+  const mergeMessages = useCallback(
+    (incoming: BubbleMsg[]) => {
+      setMessages((prev) => {
+        const map = new Map(prev.map((m) => [m.id, m]));
+        for (const msg of incoming) map.set(msg.id, msg);
+        const next = sortedMessages(Array.from(map.values()));
+        rememberLast(next);
+        return next;
+      });
+    },
+    [rememberLast]
+  );
 
-  // ─── Initial load ─────────────────────────────────────────────────
+  const refreshGuidance = useCallback(async () => {
+    if (!id) return;
+    const result = await fetch(`/api/matches/${id}/guidance`, { credentials: "include" })
+      .then((r) => r.json())
+      .catch(() => null);
+    if (result?.code === 0) setGuidance(result.data);
+  }, [id]);
+
   const initialLoad = useCallback(async () => {
     if (!id) return;
-    const [detailRes, chatRes] = await Promise.all([
-      fetch(`/api/matches/${id}`, { credentials: "include" }).then((r) =>
-        r.json()
-      ),
-      fetch(`/api/matches/${id}/chat?limit=${PAGE_SIZE}`, {
-        credentials: "include",
-      }).then((r) => r.json()),
-    ]).catch(() => [null, null]);
+
+    setGuidanceLoading(true);
+    const [detailRes, chatRes, guidanceRes] = await Promise.all([
+      fetch(`/api/matches/${id}`, { credentials: "include" })
+        .then((r) => r.json())
+        .catch(() => null),
+      fetch(`/api/matches/${id}/chat?limit=${PAGE_SIZE}`, { credentials: "include" })
+        .then((r) => r.json())
+        .catch(() => null),
+      fetch(`/api/matches/${id}/guidance`, { credentials: "include" })
+        .then((r) => r.json())
+        .catch(() => null),
+    ]);
 
     if (detailRes?.code === 0 && detailRes?.data?.targetUser) {
       setTargetName(detailRes.data.targetUser.name ?? "对方");
       setTargetUserId(detailRes.data.targetUser.id ?? null);
     }
+
     if (chatRes?.code === 0 && Array.isArray(chatRes.data)) {
-      const msgs: BubbleMsg[] = chatRes.data;
-      setMessages(msgs);
-      setHasMore(msgs.length >= PAGE_SIZE);
+      const next = sortedMessages(chatRes.data);
+      rememberLast(next);
+      setMessages(next);
+      setHasMore(next.length >= PAGE_SIZE);
       setTimeout(() => scrollToBottom(false), 60);
     }
-  }, [id, scrollToBottom]);
+
+    if (guidanceRes?.code === 0) setGuidance(guidanceRes.data);
+    setGuidanceLoading(false);
+  }, [id, rememberLast, scrollToBottom]);
 
   useEffect(() => {
     initialLoad();
   }, [initialLoad]);
 
-  // ─── SSE connection ───────────────────────────────────────────────
-  const connectSSE = useCallback(() => {
-    if (!id || !sseShouldReconnect.current) return;
-
-    const lastMsg = messages[messages.length - 1];
-    const after = lastMsg
-      ? new Date(lastMsg.createdAt).toISOString()
-      : new Date(Date.now() - 60_000).toISOString();
-
-    const es = new EventSource(
-      `/api/matches/${id}/chat/stream?after=${encodeURIComponent(after)}`
-    );
-    sseRef.current = es;
-
-    es.addEventListener("messages", (e) => {
-      const incoming: BubbleMsg[] = JSON.parse(e.data);
-      if (!incoming.length) return;
-      startTransition(() => {
-        mergeMessages(incoming);
-      });
-      setTimeout(() => scrollToBottom(), 80);
-
-      // Show typing indicator briefly for incoming from other
-      const hasIncoming = incoming.some((m) => m.senderType === "user_target");
-      if (hasIncoming) {
-        setTypingVisible(false);
-      }
-
-      // Auto mark read
-      fetch(`/api/matches/${id}/chat/read`, {
-        method: "POST",
-        credentials: "include",
-      }).catch(() => {});
-    });
-
-    es.addEventListener("read_update", () => {
-      // Refresh to pick up read status changes
-      fetch(`/api/matches/${id}/chat?limit=${PAGE_SIZE}`, {
-        credentials: "include",
-      })
-        .then((r) => r.json())
-        .then((chatRes) => {
-          if (chatRes?.code === 0 && Array.isArray(chatRes.data)) {
-            startTransition(() => mergeMessages(chatRes.data));
-          }
-        })
-        .catch(() => {});
-    });
-
-    es.addEventListener("reconnect", () => {
-      es.close();
-      if (sseShouldReconnect.current) {
-        setTimeout(connectSSE, 1000);
-      }
-    });
-
-    es.onerror = () => {
-      es.close();
-      if (sseShouldReconnect.current) {
-        setTimeout(connectSSE, 2000);
-      }
-    };
-  }, [id, mergeMessages, scrollToBottom]); // eslint-disable-line react-hooks/exhaustive-deps
-
   useEffect(() => {
-    sseShouldReconnect.current = true;
-    connectSSE();
+    if (!id) return;
+    let closed = false;
+
+    const connect = () => {
+      if (closed) return;
+      const after = lastCreatedAtRef.current ?? new Date(Date.now() - 60_000).toISOString();
+      const es = new EventSource(`/api/matches/${id}/chat/stream?after=${encodeURIComponent(after)}`);
+      sseRef.current = es;
+
+      es.addEventListener("messages", (event) => {
+        const incoming: BubbleMsg[] = JSON.parse(event.data);
+        if (!incoming.length) return;
+        startTransition(() => mergeMessages(incoming));
+        setTimeout(() => scrollToBottom(), 80);
+
+        fetch(`/api/matches/${id}/chat/read`, {
+          method: "POST",
+          credentials: "include",
+        }).catch(() => {});
+      });
+
+      es.addEventListener("read_update", () => {
+        fetch(`/api/matches/${id}/chat?limit=${PAGE_SIZE}`, { credentials: "include" })
+          .then((r) => r.json())
+          .then((chatRes) => {
+            if (chatRes?.code === 0 && Array.isArray(chatRes.data)) {
+              startTransition(() => mergeMessages(chatRes.data));
+            }
+          })
+          .catch(() => {});
+      });
+
+      es.addEventListener("reconnect", () => {
+        es.close();
+        if (!closed) setTimeout(connect, 1000);
+      });
+
+      es.onerror = () => {
+        es.close();
+        if (!closed) setTimeout(connect, 2000);
+      };
+    };
+
+    connect();
     return () => {
-      sseShouldReconnect.current = false;
+      closed = true;
       sseRef.current?.close();
     };
-  }, [connectSSE]);
+  }, [id, mergeMessages, scrollToBottom]);
 
-  // ─── Load older messages ──────────────────────────────────────────
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || !id) return;
-    setLoadingMore(true);
     const oldest = messages[0];
-    if (!oldest) {
-      setLoadingMore(false);
-      return;
-    }
+    if (!oldest) return;
+
+    setLoadingMore(true);
     try {
-      const r = await fetch(
-        `/api/matches/${id}/chat?limit=${PAGE_SIZE}&before=${encodeURIComponent(
-          oldest.createdAt
-        )}`,
+      const scrollEl = scrollRef.current;
+      const prevScrollHeight = scrollEl?.scrollHeight ?? 0;
+      const res = await fetch(
+        `/api/matches/${id}/chat?limit=${PAGE_SIZE}&before=${encodeURIComponent(oldest.createdAt)}`,
         { credentials: "include" }
-      );
-      const res = await r.json();
+      ).then((r) => r.json());
+
       if (res?.code === 0 && Array.isArray(res.data) && res.data.length > 0) {
-        const scrollEl = scrollRef.current;
-        const prevScrollHeight = scrollEl?.scrollHeight ?? 0;
         setMessages((prev) => {
           const map = new Map(prev.map((m) => [m.id, m]));
-          for (const m of res.data as BubbleMsg[]) map.set(m.id, m);
-          return Array.from(map.values()).sort(
-            (a, b) =>
-              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-          );
+          for (const msg of res.data as BubbleMsg[]) map.set(msg.id, msg);
+          const next = sortedMessages(Array.from(map.values()));
+          rememberLast(next);
+          return next;
         });
         setHasMore((res.data as BubbleMsg[]).length >= PAGE_SIZE);
-        // Keep scroll position after prepend
         requestAnimationFrame(() => {
-          if (scrollEl) {
-            scrollEl.scrollTop =
-              scrollEl.scrollHeight - prevScrollHeight;
-          }
+          if (scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight - prevScrollHeight;
         });
       } else {
         setHasMore(false);
@@ -250,9 +248,8 @@ export default function HumanChatPage() {
     } finally {
       setLoadingMore(false);
     }
-  }, [id, loadingMore, hasMore, messages]);
+  }, [hasMore, id, loadingMore, messages, rememberLast]);
 
-  // ─── Send message ─────────────────────────────────────────────────
   const send = useCallback(async () => {
     if (sending || !id) return;
     const text = input.trim();
@@ -266,19 +263,9 @@ export default function HumanChatPage() {
     if (textareaRef.current) textareaRef.current.style.height = "40px";
 
     const toSend: Array<{ content: string; pendingId: string }> = [];
-    if (text) {
-      const pid = `pending_${++pendingIdRef.current}`;
-      toSend.push({ content: text, pendingId: pid });
-    }
-    if (image) {
-      const pid = `pending_${++pendingIdRef.current}`;
-      toSend.push({
-        content: `IMAGE_DATA:${image}`,
-        pendingId: pid,
-      });
-    }
+    if (text) toSend.push({ content: text, pendingId: `pending_${++pendingIdRef.current}` });
+    if (image) toSend.push({ content: `${IMAGE_DATA_PREFIX}${image}`, pendingId: `pending_${++pendingIdRef.current}` });
 
-    // Optimistic insert
     const now = new Date().toISOString();
     const optimistic: BubbleMsg[] = toSend.map(({ content, pendingId }) => ({
       id: pendingId,
@@ -288,68 +275,71 @@ export default function HumanChatPage() {
       readByOther: false,
       pending: true,
     }));
-    setMessages((prev) => [...prev, ...optimistic]);
+    setMessages((prev) => {
+      const next = [...prev, ...optimistic];
+      rememberLast(next);
+      return next;
+    });
     setTimeout(() => scrollToBottom(), 60);
 
     try {
       for (const { content, pendingId } of toSend) {
-        const r = await fetch(`/api/matches/${id}/chat`, {
+        const res = await fetch(`/api/matches/${id}/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({ content }),
-        });
-        const res = await r.json().catch(() => null);
+        }).then((r) => r.json().catch(() => null));
+
         if (res?.code === 0 && res?.data?.id) {
-          // Replace optimistic with real
           setMessages((prev) =>
             prev.map((m) =>
-              m.id === pendingId
-                ? { ...res.data, senderType: "user_self" as const, pending: false }
-                : m
+              m.id === pendingId ? { ...res.data, senderType: "user_self" as const, pending: false } : m
             )
           );
         } else {
           setMessages((prev) =>
-            prev.map((m) =>
-              m.id === pendingId ? { ...m, pending: false, failed: true } : m
-            )
+            prev.map((m) => (m.id === pendingId ? { ...m, pending: false, failed: true } : m))
           );
         }
       }
     } finally {
       setSending(false);
+      void refreshGuidance();
     }
-  }, [id, input, selectedImageDataUrl, sending, scrollToBottom]);
+  }, [id, input, refreshGuidance, rememberLast, scrollToBottom, selectedImageDataUrl, sending]);
 
-  // ─── Textarea auto-resize ─────────────────────────────────────────
-  const onInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInput(e.target.value);
-    const el = e.target;
+  const applySuggestion = useCallback((text: string) => {
+    setInput((value) => (value.trim() ? `${value.trim()}\n${text}` : text));
+    setShowGuide(false);
+    setShowEmoji(false);
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      el.style.height = "40px";
+      el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+    });
+  }, []);
+
+  const onInputChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(event.target.value);
+    const el = event.target;
     el.style.height = "40px";
-    el.style.height = Math.min(el.scrollHeight, 120) + "px";
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
   };
 
-  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
+  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
       send();
     }
   };
 
-  // ─── Typing indicator simulation ─────────────────────────────────
-  // Show "对方正在输入" when SSE is quiet but user recently received messages
-  useEffect(() => {
-    return () => {
-      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-    };
-  }, []);
-
-  // ─── Image pick ───────────────────────────────────────────────────
   const onPickImage = async (file: File | null) => {
     if (!file || !file.type.startsWith("image/")) return;
     if (file.size > 300 * 1024) {
-      alert("图片请控制在 300KB 以内哦～");
+      alert("图片请控制在 300KB 内。");
       return;
     }
     const dataUrl: string = await new Promise((resolve, reject) => {
@@ -361,69 +351,144 @@ export default function HumanChatPage() {
     setSelectedImageDataUrl(dataUrl);
   };
 
-  // ─── Render ───────────────────────────────────────────────────────
+  const canSend = Boolean(input.trim() || selectedImageDataUrl);
+  const guideExpanded = messages.length === 0 || showGuide;
+
   return (
-    <main className="chat-shell flex h-dvh flex-col overflow-hidden bg-[#0a0d14]">
-      {/* Header */}
-      <div className="chat-header shrink-0 border-b border-white/8 bg-[#0d1120]/95 backdrop-blur-xl">
+    <main className="chat-shell flex h-dvh flex-col overflow-hidden bg-[#F7F2E8]">
+      <div className="chat-header shrink-0 border-b-2 border-[var(--ink)] bg-[#FFFDF2]">
         <AppHeader
           backHref={`/matches/${id}`}
           title={targetName}
           right={
             <div className="flex items-center gap-2">
               {targetUserId && (
-                <Link
-                  href={`/users/${targetUserId}`}
-                  className="rounded-xl border border-emerald-400/30 bg-emerald-950/40 px-3 py-1.5 text-xs text-emerald-200 transition hover:border-emerald-400/50"
-                >
-                  TA的主页
+                <Link href={`/users/${targetUserId}`} className="luxury-btn-secondary px-3 py-1.5 text-xs">
+                  TA主页
                 </Link>
               )}
               <button
                 type="button"
                 onClick={() => setFeedbackOpen(true)}
-                className="rounded-xl border border-rose-400/30 bg-rose-950/35 px-3 py-1.5 text-xs text-rose-200 transition hover:border-rose-400/50"
+                className="luxury-btn px-3 py-1.5 text-xs"
               >
-                打分
+                反馈
               </button>
             </div>
           }
         />
       </div>
 
-      {/* Message list */}
       <div
         ref={scrollRef}
         className="chat-messages flex-1 overflow-y-auto px-4 py-3"
         style={{ overscrollBehavior: "contain" }}
       >
-        {/* Load more */}
         {hasMore && (
           <div className="mb-3 flex justify-center">
             <button
               type="button"
               onClick={loadMore}
               disabled={loadingMore}
-              className="rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs text-gray-400 backdrop-blur transition hover:border-white/25 hover:text-gray-900 disabled:opacity-40"
+              className="luxury-btn-secondary px-4 py-1.5 text-xs disabled:opacity-50"
             >
-              {loadingMore ? "加载中…" : "查看更早的消息"}
+              {loadingMore ? "加载中..." : "查看更早消息"}
             </button>
           </div>
         )}
 
+        {(guidance || guidanceLoading) && (
+          <section className="mb-4 rounded-[1.25rem] border-2 border-[var(--ink)] bg-[#FFE500] p-3 shadow-[5px_5px_0_var(--ink)]">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[var(--ink)]">
+                  Qiubi Guide
+                </p>
+                <p className="mt-1 text-sm font-black text-[var(--ink)]">
+                  {messages.length === 0 ? "选一句自然开场" : "下一句可以更具体"}
+                </p>
+              </div>
+              {messages.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowGuide((value) => !value)}
+                  className="luxury-btn-secondary shrink-0 px-3 py-1 text-xs"
+                >
+                  {guideExpanded ? "收起" : "建议"}
+                </button>
+              )}
+            </div>
+
+            {!guideExpanded && guidance?.nextActions?.[0] && (
+              <p className="mt-2 text-xs font-bold leading-5 text-[var(--ink)]/70">
+                建议：{guidance.nextActions[0]}
+              </p>
+            )}
+
+            {guideExpanded && guidance && (
+              <div className="mt-3 space-y-3">
+                {!!guidance.openerSuggestions?.length && (
+                  <div>
+                    <p className="text-xs font-black text-[var(--ink)]">可直接使用</p>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      {guidance.openerSuggestions.slice(0, 4).map((item) => (
+                        <button
+                          key={item}
+                          type="button"
+                          onClick={() => applySuggestion(item)}
+                          className="min-h-[58px] rounded-xl border-2 border-[var(--ink)] bg-[#FFFDF2] px-3 py-2 text-left text-xs font-bold leading-5 text-[var(--ink)] shadow-[3px_3px_0_var(--ink)] transition hover:-translate-y-0.5 hover:bg-[#C7FF00]"
+                        >
+                          {item}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {!!guidance.nextActions?.length && (
+                  <div>
+                    <p className="text-xs font-black text-[var(--ink)]">下一步</p>
+                    <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                      {guidance.nextActions.slice(0, 3).map((item) => (
+                        <span
+                          key={item}
+                          className="whitespace-nowrap rounded-full border-2 border-[var(--ink)] bg-[#C7FF00] px-3 py-1 text-xs font-black text-[var(--ink)] shadow-[2px_2px_0_var(--ink)]"
+                        >
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {!!guidance.reflectionPrompts?.length && (
+                  <p className="rounded-xl border-2 border-[var(--ink)] bg-[#174BFF] px-3 py-2 text-xs font-bold leading-5 text-white shadow-[3px_3px_0_var(--ink)]">
+                    {guidance.reflectionPrompts[0]}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {guideExpanded && !guidance && guidanceLoading && (
+              <p className="mt-3 text-xs font-bold text-[var(--ink)]/70">正在整理聊天建议...</p>
+            )}
+          </section>
+        )}
+
         {messages.length === 0 ? (
-          <div className="flex h-full items-center justify-center">
-            <p className="text-sm text-gray-300">
-              还没有消息，发一句打个招呼吧 👋
-            </p>
+          <div className="flex min-h-[42vh] items-center justify-center">
+            <div className="glass-card max-w-sm p-5 text-center">
+              <p className="text-sm font-black">还没有消息</p>
+              <p className="mt-2 text-sm leading-6 luxury-subtitle">
+                可以选择上方建议，也可以自己发一句具体、轻松的开场。
+              </p>
+            </div>
           </div>
         ) : (
           <div className="space-y-1.5">
             {messages.map((msg, i) => (
               <div key={msg.id}>
-                {needsDivider(messages[i - 1], msg) && (
-                  <ChatTimeDivider label={fmtTime(msg.createdAt)} />
-                )}
+                {needsDivider(messages[i - 1], msg) && <ChatTimeDivider label={fmtTime(msg.createdAt)} />}
                 <ChatBubble
                   msg={msg}
                   targetName={targetName}
@@ -434,54 +499,39 @@ export default function HumanChatPage() {
           </div>
         )}
 
-        {/* Typing indicator */}
-        {typingVisible && (
-          <div className="mt-2 flex items-end gap-2">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rose-400 to-violet-500 text-sm font-bold text-white shadow">
-              {targetName[0]}
-            </div>
-            <div className="chat-typing-indicator rounded-2xl rounded-bl-sm border border-white/10 bg-white/8 px-4 py-3 backdrop-blur-md">
-              <span /><span /><span />
-            </div>
-          </div>
-        )}
-
         <div ref={bottomRef} className="h-1" />
       </div>
 
-      {/* Input bar */}
-      <div className="chat-input-bar shrink-0 border-t border-white/8 bg-[#0d1120]/95 backdrop-blur-xl">
-        {/* Image preview */}
+      <div className="chat-input-bar shrink-0 border-t-2 border-[var(--ink)] bg-[#FFFDF2]">
         {selectedImageDataUrl && (
-          <div className="flex items-center gap-2 border-b border-white/8 px-4 py-2">
+          <div className="flex items-center gap-3 border-b-2 border-[var(--ink)] px-4 py-2">
             <img
               src={selectedImageDataUrl}
-              alt="预览"
-              className="h-14 w-14 rounded-xl object-cover shadow"
+              alt="待发送图片"
+              className="h-14 w-14 rounded-xl border-2 border-[var(--ink)] object-cover shadow-[3px_3px_0_var(--ink)]"
             />
-            <div className="flex-1 text-xs text-gray-400">已选图片</div>
+            <div className="flex-1 text-xs font-black luxury-subtitle">已选择图片</div>
             <button
               type="button"
               onClick={() => setSelectedImageDataUrl(null)}
-              className="rounded-lg border border-white/15 px-3 py-1 text-xs text-gray-500 transition hover:border-white/30"
+              className="luxury-btn-secondary px-3 py-1 text-xs"
             >
               移除
             </button>
           </div>
         )}
 
-        {/* Emoji panel */}
         {showEmoji && (
-          <div className="border-b border-white/8 bg-[#0c111b]/80 px-4 py-3">
+          <div className="border-b-2 border-[var(--ink)] bg-[#FFE500] px-4 py-3">
             <div className="space-y-2">
-              {EMOJI_ROWS.map((row, ri) => (
-                <div key={ri} className="flex gap-2">
+              {EMOJI_ROWS.map((row, rowIndex) => (
+                <div key={rowIndex} className="flex flex-wrap gap-2">
                   {row.map((emoji) => (
                     <button
                       key={emoji}
                       type="button"
-                      onClick={() => setInput((p) => p + emoji)}
-                      className="flex h-9 w-9 items-center justify-center rounded-xl text-xl transition hover:bg-white/10 active:scale-90"
+                      onClick={() => setInput((value) => value + emoji)}
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border-2 border-[var(--ink)] bg-[#FFFDF2] text-lg shadow-[2px_2px_0_var(--ink)] transition hover:-translate-y-0.5"
                     >
                       {emoji}
                     </button>
@@ -492,50 +542,48 @@ export default function HumanChatPage() {
           </div>
         )}
 
-        {/* Text input row */}
         <div className="flex items-end gap-2 px-3 py-3">
-          {/* Emoji toggle */}
           <button
             type="button"
-            onClick={() => setShowEmoji((v) => !v)}
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xl transition ${
-              showEmoji
-                ? "bg-amber-400/20 text-amber-300"
-                : "text-gray-400 hover:text-gray-600"
+            onClick={() => setShowEmoji((value) => !value)}
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 border-[var(--ink)] text-xl shadow-[3px_3px_0_var(--ink)] ${
+              showEmoji ? "bg-[#FFE500]" : "bg-[#FFFDF2]"
             }`}
+            aria-label="表情"
           >
             😊
           </button>
 
-          {/* Textarea */}
           <textarea
             ref={textareaRef}
             value={input}
             onChange={onInputChange}
             onKeyDown={onKeyDown}
-            placeholder="发消息…"
+            placeholder="发消息..."
             rows={1}
-            className="chat-textarea flex-1 resize-none rounded-2xl border border-white/15 bg-white/8 px-4 py-2.5 text-sm text-gray-900 placeholder-amber-100/35 outline-none backdrop-blur transition focus:border-rose-400/40 focus:bg-white/12 focus:ring-1 focus:ring-rose-400/20"
+            className="chat-textarea flex-1 resize-none rounded-2xl border-2 border-[var(--ink)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--ink)] shadow-[3px_3px_0_var(--ink)] outline-none placeholder:text-black/35 focus:shadow-[5px_5px_0_#174BFF]"
             style={{ height: "40px", maxHeight: "120px" }}
           />
 
-          {/* Image */}
-          <label className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl text-xl text-gray-400 transition hover:text-gray-600">
+          <label className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border-2 border-[var(--ink)] bg-[#FFFDF2] text-xl shadow-[3px_3px_0_var(--ink)] transition hover:-translate-y-0.5">
             <input
               type="file"
               accept="image/*"
               className="hidden"
-              onChange={(e) => onPickImage(e.target.files?.[0] ?? null)}
+              onChange={(event) => {
+                void onPickImage(event.target.files?.[0] ?? null);
+                event.currentTarget.value = "";
+              }}
             />
             📷
           </label>
 
-          {/* Send */}
           <button
             type="button"
             onClick={send}
-            disabled={sending || (!input.trim() && !selectedImageDataUrl)}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500 to-rose-600 text-white shadow-md shadow-rose-500/30 transition active:scale-95 disabled:opacity-40"
+            disabled={sending || !canSend}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 border-[var(--ink)] bg-[#C7FF00] text-[var(--ink)] shadow-[3px_3px_0_var(--ink)] transition active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0_var(--ink)] disabled:opacity-40"
+            aria-label="发送"
           >
             {sending ? (
               <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -551,11 +599,7 @@ export default function HumanChatPage() {
         </div>
       </div>
 
-      <MatchFeedbackModal
-        matchId={id}
-        open={feedbackOpen}
-        onClose={() => setFeedbackOpen(false)}
-      />
+      <MatchFeedbackModal matchId={id} open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
     </main>
   );
 }

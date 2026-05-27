@@ -1,3 +1,5 @@
+import { parseArray } from "@/lib/utils";
+
 export type RelationshipGoal = "romance" | "soulmate" | "companion" | "marriage" | "unknown";
 export type AttachmentType = "secure" | "anxious" | "avoidant";
 export type Pace = "low" | "medium" | "high";
@@ -6,11 +8,11 @@ export type UserModel = {
   userId: string;
   relationshipGoal: RelationshipGoal;
   attachmentType: AttachmentType;
-  emotionalStability: number; // 0..100
+  emotionalStability: number;
   conflictStyle: "direct" | "avoidant" | "balanced";
   communicationPace: Pace;
-  communicationInitiative: number; // 0..100
-  intimacyNeed: number; // 0..100
+  communicationInitiative: number;
+  intimacyNeed: number;
   valuePriority: {
     career: number;
     family: number;
@@ -31,8 +33,8 @@ export type UserModel = {
   talkStyle: "rational" | "emotional" | "humor" | "sharp" | "balanced";
   avgReplyMinutes: number;
   avgMsgLength: number;
-  dialogDepth: number; // 0..100
-  qualityScore: number; // 0..100
+  dialogDepth: number;
+  qualityScore: number;
   qualityFlags: string[];
   embedding1024: number[];
 };
@@ -51,66 +53,55 @@ type InferInput = {
   userMessageCreatedAt: Date[];
 };
 
-function parseArray(raw?: string | null): string[] {
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed.map((x) => String(x).trim()).filter(Boolean);
-  } catch {
-    // ignore
-  }
-  return [];
+function clamp(value: number, min = 0, max = 100) {
+  return Math.max(min, Math.min(max, value));
 }
 
-function clamp(v: number, min = 0, max = 100) {
-  return Math.max(min, Math.min(max, v));
-}
-
-function paceToNum(p: Pace) {
-  return p === "low" ? 0 : p === "medium" ? 1 : 2;
+function paceToNum(pace: Pace) {
+  return pace === "low" ? 0 : pace === "medium" ? 1 : 2;
 }
 
 function detectGoal(matchTypes: string[]): RelationshipGoal {
-  const t = matchTypes.join("|");
-  if (/结婚|婚姻|长期伴侣/.test(t)) return "marriage";
-  if (/恋人|恋爱|对象/.test(t)) return "romance";
-  if (/灵魂|深度|精神/.test(t)) return "soulmate";
-  if (/陪伴|搭子|朋友|玩伴/.test(t)) return "companion";
+  const text = matchTypes.join("|");
+  if (/结婚|婚姻|长期伴侣|marriage/i.test(text)) return "marriage";
+  if (/恋人|恋爱|对象|认真关系|romance|serious/i.test(text)) return "romance";
+  if (/灵魂|深度|精神|soul/i.test(text)) return "soulmate";
+  if (/陪伴|搭子|朋友|玩伴|casual|companion/i.test(text)) return "companion";
   return "unknown";
 }
 
 function inferAttachment(text: string): AttachmentType {
-  if (/安全感|边界|稳定|信任/.test(text)) return "secure";
-  if (/害怕|焦虑|患得患失|不安/.test(text)) return "anxious";
-  if (/独处|慢热|保持距离|回避/.test(text)) return "avoidant";
+  if (/安全感|边界|稳定|信任|secure/i.test(text)) return "secure";
+  if (/害怕|焦虑|患得患失|不安|anxious/i.test(text)) return "anxious";
+  if (/独处|慢热|保持距离|回避|avoid/i.test(text)) return "avoidant";
   return "secure";
 }
 
 function inferTalkStyle(text: string): UserModel["talkStyle"] {
-  if (/哈哈|hh|有趣|玩笑/.test(text)) return "humor";
-  if (/逻辑|理性|分析|结构/.test(text)) return "rational";
-  if (/感受|情绪|共鸣|在乎/.test(text)) return "emotional";
-  if (/烦|滚|无语|尖锐/.test(text)) return "sharp";
+  if (/哈哈|hh|有趣|玩笑|幽默|funny/i.test(text)) return "humor";
+  if (/逻辑|理性|分析|结构|rational/i.test(text)) return "rational";
+  if (/感受|情绪|共鸣|在乎|emotional/i.test(text)) return "emotional";
+  if (/怼|尖锐|犀利|sharp/i.test(text)) return "sharp";
   return "balanced";
 }
 
 function inferValuePriority(text: string) {
-  const score = (kw: RegExp) => (kw.test(text) ? 80 : 55);
+  const score = (pattern: RegExp) => (pattern.test(text) ? 80 : 55);
   return {
-    career: score(/事业|工作|成长|目标|效率/),
-    family: score(/家庭|亲密|陪伴|关系|稳定/),
-    freedom: score(/自由|空间|独处|松弛/),
-    growth: score(/学习|提升|迭代|进步/),
+    career: score(/事业|工作|成长|目标|效率|career|work/i),
+    family: score(/家庭|亲密|陪伴|关系|稳定|family/i),
+    freedom: score(/自由|空间|独处|松弛|freedom/i),
+    growth: score(/学习|提升|迭代|进步|成长|growth/i),
   };
 }
 
 function inferTopicPref(text: string) {
-  const hit = (kw: RegExp) => (kw.test(text) ? 78 : 52);
+  const hit = (pattern: RegExp) => (pattern.test(text) ? 78 : 52);
   return {
-    life: hit(/周末|日常|生活|吃饭|散步|城市/),
-    emotion: hit(/情绪|关系|安全感|边界|共鸣/),
-    work: hit(/工作|职业|项目|创业|成长/),
-    entertainment: hit(/电影|游戏|音乐|看展|旅行/),
+    life: hit(/周末|日常|生活|吃饭|散步|城市|life/i),
+    emotion: hit(/情绪|关系|安全感|边界|共鸣|emotion/i),
+    work: hit(/工作|职业|项目|创业|成长|work|career/i),
+    entertainment: hit(/电影|游戏|音乐|看展|旅行|entertainment|movie|music|game/i),
   };
 }
 
@@ -123,11 +114,11 @@ function buildEmbedding1024(text: string): number[] {
     .split(/\s+/)
     .filter((x) => x.length > 1);
   for (const token of tokens) {
-    let h = 0;
-    for (let i = 0; i < token.length; i++) h = (h * 131 + token.charCodeAt(i)) >>> 0;
-    vec[h % dims] += 1;
+    let hash = 0;
+    for (let i = 0; i < token.length; i++) hash = (hash * 131 + token.charCodeAt(i)) >>> 0;
+    vec[hash % dims] += 1;
   }
-  const norm = Math.sqrt(vec.reduce((s, x) => s + x * x, 0)) || 1;
+  const norm = Math.sqrt(vec.reduce((sum, x) => sum + x * x, 0)) || 1;
   return vec.map((x) => x / norm);
 }
 
@@ -166,37 +157,45 @@ export function inferUserModel(input: InferInput): UserModel {
   if (input.userMessageCreatedAt.length >= 2) {
     const sorted = [...input.userMessageCreatedAt].sort((a, b) => a.getTime() - b.getTime());
     let total = 0;
-    for (let i = 1; i < sorted.length; i++) total += Math.max(1, (sorted[i].getTime() - sorted[i - 1].getTime()) / 60000);
+    for (let i = 1; i < sorted.length; i++) {
+      total += Math.max(1, (sorted[i].getTime() - sorted[i - 1].getTime()) / 60000);
+    }
     avgReplyMinutes = total / (sorted.length - 1);
   }
+
   const avgMsgLength =
     input.userMessages.length > 0
-      ? input.userMessages.reduce((s, x) => s + x.length, 0) / input.userMessages.length
+      ? input.userMessages.reduce((sum, x) => sum + x.length, 0) / input.userMessages.length
       : 16;
 
-  const negativeHits = (allText.match(/不想|算了|烦|没兴趣|滚|无语|讨厌/g) ?? []).length;
-  const offensiveHits = (allText.match(/滚|傻|蠢|恶心|骚扰/g) ?? []).length;
-  const depthHits = (allText.match(/为什么|如何|价值观|边界|长期|未来|信任/g) ?? []).length;
+  const negativeHits = (allText.match(/不想|算了|烦|没兴趣|无语|讨厌|negative/gi) ?? []).length;
+  const offensiveHits = (allText.match(/骚扰|恶心|辱骂|攻击|offensive/gi) ?? []).length;
+  const depthHits = (allText.match(/为什么|如何|价值观|边界|长期|未来|信任|relationship|future/gi) ?? []).length;
 
   const qualityFlags: string[] = [];
   if (offensiveHits >= 2) qualityFlags.push("表达冒犯");
   if (negativeHits >= 5) qualityFlags.push("态度消极");
   if (avgMsgLength < 8 && input.userMessages.length >= 8) qualityFlags.push("表达过短");
   const qualityScore = clamp(76 - offensiveHits * 20 - negativeHits * 4 - (avgMsgLength < 8 ? 8 : 0));
+  const relationshipGoal = detectGoal(matchTypes);
 
   return {
     userId: input.userId,
-    relationshipGoal: detectGoal(matchTypes),
+    relationshipGoal,
     attachmentType: inferAttachment(allText),
     emotionalStability: clamp(68 - negativeHits * 4 + depthHits * 1.5),
     conflictStyle:
       input.emotionStyle === "direct" ? "direct" : input.emotionStyle === "slow" ? "avoidant" : "balanced",
     communicationPace,
     communicationInitiative: clamp(55 + (communicationPace === "high" ? 18 : communicationPace === "low" ? -12 : 0)),
-    intimacyNeed: clamp(60 + (detectGoal(matchTypes) === "marriage" ? 18 : detectGoal(matchTypes) === "companion" ? -10 : 5)),
+    intimacyNeed: clamp(60 + (relationshipGoal === "marriage" ? 18 : relationshipGoal === "companion" ? -10 : 5)),
     valuePriority: inferValuePriority(allText),
-    consumeStyle: /理性|预算|计划/.test(allText) ? "rational" : /冲动|随便买/.test(allText) ? "impulse" : "balanced",
-    timeStyle: /计划|安排|准时|规律/.test(allText) ? "planful" : "flexible",
+    consumeStyle: /理性|预算|计划|rational/i.test(allText)
+      ? "rational"
+      : /冲动|随便买|impulse/i.test(allText)
+        ? "impulse"
+        : "balanced",
+    timeStyle: /计划|安排|准时|规律|plan/i.test(allText) ? "planful" : "flexible",
     expectedFrequency,
     expectedAdvancePace,
     redFlags: parseArray(input.keywords).filter((x) => /雷点|不能|不接受|底线/.test(x)),
@@ -249,8 +248,8 @@ export function scoreCompatibility(a: UserModel, b: UserModel) {
 
   let finalScore = clamp(sim * 55 + attachScore * 0.15 + rhythmScore * 0.13 + emotionScore * 0.09 + valueScore * 0.08);
   if (hardRejectReasons.includes("沟通节奏差异过大")) finalScore = clamp(finalScore - 15);
-  if (valueScore < 55) hardRejectReasons.push("价值观冲突显著");
-  if (hardRejectReasons.includes("价值观冲突显著")) finalScore = clamp(finalScore - 25);
+  if (valueScore < 55) hardRejectReasons.push("价值观冲突明显");
+  if (hardRejectReasons.includes("价值观冲突明显")) finalScore = clamp(finalScore - 25);
 
   return {
     finalScore: Math.round(finalScore),
@@ -264,4 +263,3 @@ export function scoreCompatibility(a: UserModel, b: UserModel) {
     },
   };
 }
-

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { learnFromMatchFeedback } from "@/lib/feedbackLearning";
 
 const BASE_URL = process.env.SECONDME_API_BASE_URL;
 
@@ -9,12 +10,12 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ code: 401 }, { status: 401 });
+  if (!user) return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
   const { id: matchId } = await params;
   const match = await prisma.match.findFirst({
     where: { id: matchId, userId: user.id },
   });
-  if (!match) return NextResponse.json({ code: 404 }, { status: 404 });
+  if (!match) return NextResponse.json({ code: 404, message: "匹配不存在" }, { status: 404 });
   const body = await request.json();
   const vibeScore = Math.min(5, Math.max(0, Number(body.vibeScore) ?? 0));
   const valuesScore = Math.min(5, Math.max(0, Number(body.valuesScore) ?? 0));
@@ -30,11 +31,19 @@ export async function POST(
       comment: comment || undefined,
     },
   });
+  const learning = await learnFromMatchFeedback({
+    userId: user.id,
+    matchId,
+    vibeScore,
+    valuesScore,
+    potentialScore,
+    comment,
+  }).catch(() => ({ learned: false, reason: "learning_failed" }));
   const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
   if (dbUser?.accessToken && (comment || [vibeScore, valuesScore, potentialScore].some((s) => s > 0))) {
     const noteContent = [
       `[丘比·聊天反馈] 匹配 ${matchId}`,
-      `聊天感觉: ${vibeScore}/5 | 价值观契合: ${valuesScore}/5 | 发展潜力: ${potentialScore}/5`,
+      `聊天感觉: ${vibeScore}/5 | 价值观合拍: ${valuesScore}/5 | 发展潜力: ${potentialScore}/5`,
       comment ? `反馈: ${comment}` : "",
     ]
       .filter(Boolean)
@@ -49,7 +58,7 @@ export async function POST(
         body: JSON.stringify({ content: noteContent, memoryType: "TEXT" }),
       });
     } catch {
-      // 忽略 note 失败，本地已存
+      // Ignore remote note failures; local feedback has already been saved.
     }
   }
   return NextResponse.json({
@@ -61,6 +70,7 @@ export async function POST(
       potentialScore: feedback.potentialScore,
       comment: feedback.comment,
       createdAt: feedback.createdAt.toISOString(),
+      learning,
     },
   });
 }

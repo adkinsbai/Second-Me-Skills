@@ -1,20 +1,7 @@
 import type { User, UserPreference } from "@prisma/client";
+import { parseArray as parseProfileArray } from "@/lib/utils";
 
 export type UserWithPreference = User & { preference: UserPreference | null };
-
-export function parseProfileArray(raw?: string | null): string[] {
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed.map((x) => String(x).trim()).filter(Boolean);
-  } catch {
-    // ignore non-JSON legacy strings
-  }
-  return raw
-    .split(/[,，、/|\s]+/)
-    .map((x) => x.trim())
-    .filter(Boolean);
-}
 
 function unique<T>(items: T[]): T[] {
   return Array.from(new Set(items));
@@ -24,10 +11,15 @@ export function buildProfileCorpus(user: UserWithPreference) {
   return [
     user.name,
     user.bio,
+    user.gender,
+    user.age,
     user.preference?.region,
     user.preference?.keywords,
     user.preference?.matchTypes,
     user.preference?.activityTags,
+    user.preference?.chatPace,
+    user.preference?.meetPreference,
+    user.preference?.emotionStyle,
   ]
     .filter(Boolean)
     .join(" ");
@@ -88,11 +80,12 @@ export function sharedTags(self: UserWithPreference, candidate: UserWithPreferen
 export function sharedProfessions(a: string, b: string) {
   const professions = [
     { label: "产品设计师", patterns: [/产品设计师|product designer|ux designer|ui designer|体验设计/i] },
-    { label: "产品人", patterns: [/产品经理|产品人|PM|product manager/i] },
+    { label: "产品经理", patterns: [/产品经理|PM|product manager/i] },
     { label: "设计师", patterns: [/设计师|designer|设计/i] },
     { label: "创业者", patterns: [/创业|创始人|founder/i] },
     { label: "工程师", patterns: [/工程师|程序员|开发|engineer|developer/i] },
     { label: "艺术创作者", patterns: [/艺术|创作|摄影|音乐|写作|artist|creator/i] },
+    { label: "学生", patterns: [/学生|研究生|大学|student/i] },
   ];
   return professions
     .filter((item) => item.patterns.some((re) => re.test(a)) && item.patterns.some((re) => re.test(b)))
@@ -127,29 +120,29 @@ export function buildMatchStory(self: UserWithPreference, candidate: UserWithPre
     { ...candidate, preference: candidate.preference ? { ...candidate.preference, activityTags: null, keywords: null } : null }
   );
 
-  if (cities.length >= 2 && professions.length > 0) {
-    return `或许有一刻，你与 TA 曾在${cities[0]}的街道擦肩而过，把同一种野心和孤独藏进人群；而此刻，${cities[1]}又把你们重新推到彼此面前。两个同样在意体验、秩序与美感的${professions[0]}，一个创造产品里的心动，一个也在现实里等待被看见。也许这不是一次普通推荐，而是一段故事终于找到了开头。`;
-  }
-
-  if (cities.length > 0 && professions.length > 0) {
-    return `丘比看见，你们都把${cities[0]}写进了生活的坐标，也都在用${professions[0]}的方式理解世界：把混乱理顺，把需求照亮，把普通日子雕刻成可被记住的体验。也许你们真正相似的地方，不只是标签，而是都相信人和人之间可以被认真设计、温柔靠近。`;
+  if (cities.length >= 1 && professions.length > 0) {
+    return `丘比看到你们都把 ${cities[0]} 写进了生活坐标，也都在用 ${professions[0]} 的方式理解世界。相似的城市经验和工作语境，会让开场更自然，也更容易聊到具体生活。`;
   }
 
   if (cities.length > 0 && tags.length > 0) {
-    return `在${cities[0]}这座巨大的城市里，两个陌生人都把「${tags[0]}」留在了自己的期待里。人海每天都在擦肩，但不是每一次擦肩都有回声；这一次，丘比听见了你们之间那点微弱却明亮的共振。也许你们可以从一个很小的问题开始，把这座城市聊成只属于你们的地图。`;
+    return `在 ${cities[0]} 这座城市里，你们都提到了「${tags[0]}」。这不是一个冷冰冰的标签，而是可以变成第一句开场、一次散步或一段共同体验的线索。`;
   }
 
   if (professions.length > 0 && tags.length > 0) {
-    return `你们像是两条各自燃烧的轨道：同样带着${professions[0]}的敏感与创造力，也同样被「${tags[0]}」吸引。你们或许都太习惯把好的体验留给别人，却忘了自己也值得被认真体验、被热烈回应。丘比想把你们放到同一页故事里，看看两个会创造美的人，能不能也创造一段美妙关系。`;
+    return `你们都带着 ${professions[0]} 的敏感度，也都被「${tags[0]}」吸引。丘比判断这段匹配更适合从具体作品、体验或最近的生活观察聊起。`;
   }
 
   if (tags.length >= 2) {
-    return `丘比在你们身上看见了两簇相似的火：一簇叫「${tags[0]}」，一簇叫「${tags[1]}」。它们不喧哗，却足够把两个原本陌生的人照亮。也许你们不必急着定义关系，只需要从一次真诚的开场开始，让那些相似的渴望慢慢认出彼此。`;
+    return `丘比在你们身上看到了两簇相似的火花：「${tags[0]}」和「${tags[1]}」。它们足够小，也足够真实，适合作为第一轮对话的起点。`;
+  }
+
+  if (tags.length === 1) {
+    return `你们都留下了「${tags[0]}」这个共同线索。丘比建议先从这个小话题开始，不急着定义关系，先确认彼此的表达和节奏是否舒服。`;
   }
 
   if (relationTypes.length > 0) {
-    return `你们都在寻找「${relationTypes[0]}」，这四个字背后不是随便认识一个人，而是想被理解、被接住、被某个同频的灵魂轻轻点亮。丘比把 TA 带到你面前，是因为你们的期待像两封还没寄出的信，终于有机会投向同一个地址。`;
+    return `你们都在寻找「${relationTypes[0]}」。这说明你们对关系的入口有相似期待，适合先用轻松但真诚的对话确认是否同频。`;
   }
 
-  return "丘比没有只看几个冰冷标签，而是把你们的表达、节奏、期待和生活气味放在一起听。它听见两颗心都在小心翼翼地寻找一个可以真实开始的人：不必表演，不必迎合，只要一句真诚的开场，或许就能让故事往前走一步。";
+  return "丘比没有只看几个标签，而是把你们的资料、表达节奏、关系期待和生活气味放在一起比较。当前信号显示：这是一段值得从真诚开场开始验证的匹配。";
 }

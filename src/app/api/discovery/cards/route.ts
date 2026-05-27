@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { runMatchPipeline } from "@/lib/matchPipeline";
-import { buildMatchStory, extractProfileTraits, parseProfileArray, type UserWithPreference } from "@/lib/matchStory";
+import { buildMatchStory, extractProfileTraits, type UserWithPreference } from "@/lib/matchStory";
+import { parseProfileArray } from "@/lib/utils";
+import { preferenceSignalHits, preferenceSignalScore } from "@/lib/preferenceSignals";
 
 /** 把站内相对路径补成绝对 URL，避免本机开发时 <img> 请求错主机导致「刷不出图」 */
 function requestOrigin(request: NextRequest): string {
@@ -48,27 +50,6 @@ function distanceKm(aLat?: number | null, aLng?: number | null, bLat?: number | 
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
   return Math.round(2 * r * Math.asin(Math.sqrt(h)));
-}
-
-function jsonArray(raw: unknown): string[] {
-  if (Array.isArray(raw)) return raw.map(String);
-  if (raw && typeof raw === "object" && "tags" in raw) {
-    const tags = (raw as { tags?: unknown }).tags;
-    if (Array.isArray(tags)) return tags.map(String);
-  }
-  return [];
-}
-
-function tasteBoost(signal: { likedTraitsJson: unknown } | null, candidate: UserWithPreference) {
-  if (!signal) return 0;
-  const liked = new Set(jsonArray(signal.likedTraitsJson).map((x) => x.toLowerCase()));
-  if (liked.size === 0) return 0;
-  const candidateTags = [
-    ...parseProfileArray(candidate.preference?.matchTypes),
-    ...parseProfileArray(candidate.preference?.activityTags),
-    ...parseProfileArray(candidate.preference?.keywords),
-  ].map((x) => x.toLowerCase());
-  return candidateTags.reduce((score, tag) => score + (liked.has(tag) ? 8 : 0), 0);
 }
 
 function photosFor(user: UserWithPreference, pathBase: string) {
@@ -120,7 +101,7 @@ export async function GET(request: NextRequest) {
       const geoBoost = km != null ? Math.max(0, 30 - Math.min(30, km / 5)) : sameRegion ? 12 : 0;
       return {
         item,
-        rankScore: item.scored.finalScore + geoBoost + tasteBoost(self.preferenceSignal, candidate),
+        rankScore: item.scored.finalScore + geoBoost + preferenceSignalScore(self.preferenceSignal, candidate, { likedWeight: 8, unlikedWeight: -8 }),
         km,
         sameRegion,
       };
@@ -131,6 +112,7 @@ export async function GET(request: NextRequest) {
   const cards = ranked.map(({ item, km, sameRegion }) => {
     const candidate = item.candidate as UserWithPreference;
     const traits = extractProfileTraits(candidate);
+    const preferenceHits = preferenceSignalHits(self.preferenceSignal, candidate);
     return {
       id: candidate.id,
       name: candidate.name,
@@ -143,6 +125,13 @@ export async function GET(request: NextRequest) {
       distanceLabel: km != null ? `${km}km` : sameRegion ? "同城" : candidate.preference?.region ?? "距离未知",
       tags: traits.tags.slice(0, 6),
       story: buildMatchStory(selfWithPref, candidate),
+      preferenceHits,
+      modelSignals: {
+        rhythm: item.scored.explain.rhythm,
+        emotion: item.scored.explain.emotion,
+        values: item.scored.explain.values,
+        attachment: item.scored.explain.attachment,
+      },
     };
   });
 
