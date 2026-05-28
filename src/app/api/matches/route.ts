@@ -56,12 +56,44 @@ export async function GET() {
         },
       });
 
+      // Calculate star stats
+      const userMessages = await prisma.matchMessage.findMany({
+        where: { matchId: m.id, senderType: { startsWith: "user_" } },
+        select: { createdAt: true },
+        orderBy: { createdAt: "asc" },
+      });
+      const chatDates = userMessages.map((msg) => msg.createdAt.toISOString().split("T")[0]);
+      const chatDayCount = new Set(chatDates).size;
+      const isStarLit = chatDayCount >= 1;
+      // Calculate consecutive days
+      let starDays = 0;
+      if (chatDates.length > 0) {
+        const sorted = Array.from(new Set(chatDates)).sort().reverse();
+        const today = new Date().toISOString().split("T")[0];
+        if (sorted[0] === today) {
+          starDays = 1;
+          for (let i = 1; i < sorted.length; i++) {
+            const prev = new Date(sorted[i - 1]);
+            const curr = new Date(sorted[i]);
+            if ((prev.getTime() - curr.getTime()) / (1000 * 60 * 60 * 24) === 1) {
+              starDays++;
+            } else {
+              break;
+            }
+          }
+        }
+      }
+
       return {
         id: m.id,
         status: m.status,
         targetUser: m.targetUser,
         matchReason: latest ? extractMatchReason(latest.reportJson, latest.summary) : "",
         unreadCount,
+        starDays,
+        starLitAt: m.starLitAt?.toISOString() ?? null,
+        chatDayCount,
+        isStarLit,
         updatedAt: m.updatedAt.toISOString(),
       };
     })

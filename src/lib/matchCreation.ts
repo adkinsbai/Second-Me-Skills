@@ -83,6 +83,24 @@ async function ensureScore(
   });
 }
 
+/**
+ * Compute compatibility score between two users without creating a match.
+ * Returns the finalScore (0-100).
+ */
+export async function computeCompatibilityBetween(userId: string, targetUserId: string): Promise<number> {
+  const [self, target] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, include: { preference: true } }),
+    prisma.user.findUnique({ where: { id: targetUserId }, include: { preference: true } }),
+  ]);
+  if (!self || !target) return 0;
+  const [selfModel, targetModel] = await Promise.all([
+    buildModelForUser(self as UserWithPreference),
+    buildModelForUser(target as UserWithPreference),
+  ]);
+  const scored = scoreCompatibility(selfModel, targetModel);
+  return scored.finalScore;
+}
+
 export async function createConnectedMatchPair(userId: string, targetUserId: string) {
   const [self, target] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, include: { preference: true } }),
@@ -94,6 +112,10 @@ export async function createConnectedMatchPair(userId: string, targetUserId: str
     buildModelForUser(self as UserWithPreference),
     buildModelForUser(target as UserWithPreference),
   ]);
+
+  // Compute compatibility score
+  const scored = scoreCompatibility(selfModel, targetModel);
+  const compatibilityScore = scored.finalScore;
 
   const [match, reciprocal] = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     let ownerMatch = await tx.match.findFirst({
@@ -122,5 +144,5 @@ export async function createConnectedMatchPair(userId: string, targetUserId: str
     ensureScore(reciprocal.id, target as UserWithPreference, self as UserWithPreference, targetModel, selfModel),
   ]);
 
-  return { matchId: match.id, reciprocalMatchId: reciprocal.id };
+  return { matchId: match.id, reciprocalMatchId: reciprocal.id, compatibilityScore };
 }

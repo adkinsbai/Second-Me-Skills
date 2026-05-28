@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { createConnectedMatchPair } from "@/lib/matchCreation";
+import { createConnectedMatchPair, computeCompatibilityBetween } from "@/lib/matchCreation";
+import { MATCH_THRESHOLD } from "@/lib/matchPipeline";
 import { extractProfileTraits, type UserWithPreference } from "@/lib/matchStory";
 
 function snapshotFor(user: UserWithPreference): Prisma.InputJsonValue {
@@ -54,15 +55,23 @@ export async function POST(request: NextRequest) {
 
   let mutualMatch = false;
   let matchId: string | null = null;
+  let mutualLike = false;
+  let compatibilityScore: number | null = null;
   if (action === "like") {
     const reciprocal = await prisma.userSwipeDecision.findUnique({
       where: { viewerId_targetUserId: { viewerId: targetUserId, targetUserId: user.id } },
       select: { action: true },
     });
     if (reciprocal?.action === "like") {
-      const created = await createConnectedMatchPair(user.id, targetUserId);
-      mutualMatch = true;
-      matchId = created.matchId;
+      mutualLike = true;
+      // Compute compatibility score before deciding to create match
+      compatibilityScore = await computeCompatibilityBetween(user.id, targetUserId);
+      if (compatibilityScore >= MATCH_THRESHOLD) {
+        const created = await createConnectedMatchPair(user.id, targetUserId);
+        mutualMatch = true;
+        matchId = created.matchId;
+      }
+      // If score < MATCH_THRESHOLD, mutual like is recorded but no Match is created
     }
   }
 
@@ -71,7 +80,9 @@ export async function POST(request: NextRequest) {
     data: {
       action,
       mutualMatch,
+      mutualLike,
       matchId,
+      compatibilityScore,
     },
   });
 }

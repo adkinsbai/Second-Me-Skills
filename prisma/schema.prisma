@@ -167,6 +167,9 @@ model Match {
   userId       String   @map("user_id")
   targetUserId String   @map("target_user_id")
   status       String   @default("screening")
+  starDays     Int      @default(0) @map("star_days")        // 连续聊天点亮星星天数
+  starLitAt    DateTime? @map("star_lit_at")                 // 星星首次点亮时间
+  chatDayCount Int      @default(0) @map("chat_day_count")   // 总聊天天数
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 

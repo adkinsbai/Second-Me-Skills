@@ -5,6 +5,7 @@ import { preferenceSignalScore } from "@/lib/preferenceSignals";
 import { parseArray } from "@/lib/utils";
 
 const MAX_SCAN = 500;
+export const MATCH_THRESHOLD = 60;
 
 export type PipelineStageStat = {
   id: string;
@@ -295,14 +296,17 @@ export async function runMatchPipeline(selfId: string, excludeIds: string[]): Pr
     rankedRaw.push({ candidate: candidate as UserWithPref, targetModel, scored });
   }
 
+  // Filter by match threshold
+  const thresholdFiltered = rankedRaw.filter(r => r.scored.finalScore >= MATCH_THRESHOLD);
+
   // Pre-compute signal scores to avoid redundant work in the sort comparator
   const signalScoreMap = new Map<string, number>();
   const selfSignal = (dbUser as UserWithPref).preferenceSignal;
-  for (const r of rankedRaw) {
+  for (const r of thresholdFiltered) {
     signalScoreMap.set(r.candidate.id, preferenceSignalScore(selfSignal, r.candidate));
   }
 
-  rankedRaw.sort(
+  thresholdFiltered.sort(
     (a, b) =>
       b.scored.finalScore +
       (signalScoreMap.get(b.candidate.id) ?? 0) -
@@ -335,10 +339,16 @@ export async function runMatchPipeline(selfId: string, excludeIds: string[]): Pr
       count: rankedRaw.length,
     },
     {
+      id: "threshold_pass",
+      title: "匹配阈值过滤",
+      detail: `只保留综合评分 >= ${MATCH_THRESHOLD} 的候选人。`,
+      count: thresholdFiltered.length,
+    },
+    {
       id: "ranked",
       title: "推荐排序",
       detail: "按综合信号排序，挑出本轮最值得认识的人。",
-      count: rankedRaw.length,
+      count: thresholdFiltered.length,
     },
   ];
 
@@ -383,5 +393,5 @@ export async function runMatchPipeline(selfId: string, excludeIds: string[]): Pr
     },
   ];
 
-  return { stages, ranked: rankedRaw, selfModel, dimensions: MATCH_DIMENSIONS, infoSources };
+  return { stages, ranked: thresholdFiltered, selfModel, dimensions: MATCH_DIMENSIONS, infoSources };
 }

@@ -132,6 +132,8 @@ export async function GET(request: NextRequest) {
         values: item.scored.explain.values,
         attachment: item.scored.explain.attachment,
       },
+      compatibilityScore: item.scored.finalScore,
+      matchPotential: item.scored.finalScore >= 80 ? 'high' : item.scored.finalScore >= 60 ? 'medium' : 'low',
     };
   });
 

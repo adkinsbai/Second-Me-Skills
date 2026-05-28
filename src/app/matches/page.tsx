@@ -26,6 +26,9 @@ type MatchItem = {
   };
   matchReason: string;
   unreadCount: number;
+  chatDayCount?: number;
+  isStarLit?: boolean;
+  createdAt?: string;
 };
 
 type MatchSearchReport = {
@@ -56,7 +59,7 @@ function Avatar({ src, name, size = 48 }: { src?: string | null; name: string; s
     >
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt={name || 'avatar'} className="absolute inset-0 h-full w-full object-cover" referrerPolicy="no-referrer" />
+        <img src={src} alt={name || "avatar"} className="absolute inset-0 h-full w-full object-cover" referrerPolicy="no-referrer" />
       ) : (
         <div className="absolute inset-0 flex items-center justify-center font-black text-[var(--ink)]" style={{ fontSize: size * 0.36 }}>
           {(name?.[0] ?? "?").toUpperCase()}
@@ -64,6 +67,18 @@ function Avatar({ src, name, size = 48 }: { src?: string | null; name: string; s
       )}
     </div>
   );
+}
+
+function formatDate(dateString?: string): string {
+  if (!dateString) return "";
+  try {
+    const date = new Date(dateString);
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    return `${month}月${day}日`;
+  } catch {
+    return "";
+  }
 }
 
 const FEATURES = [
@@ -117,6 +132,8 @@ export default function MatchesPage() {
   const [seedSuccess, setSeedSuccess] = useState(false);
   const [searchReport, setSearchReport] = useState<MatchSearchReport | null>(null);
   const [updateModalOpen, setUpdateModalOpen] = useState(false);
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const [newlyLitStars, setNewlyLitStars] = useState<Set<string>>(new Set());
 
   const load = async () => {
     setSeedError(null);
@@ -148,10 +165,20 @@ export default function MatchesPage() {
         return;
       }
       if (result.code === 0) {
-        setList(result.data.list ?? []);
+        const matchList: MatchItem[] = result.data.list ?? [];
+        setList(matchList);
         setDailyMatchTime(result.data.dailyMatchTime ?? "21:00");
         setTodayMatchedCount(Number(result.data.todayMatchedCount ?? 0));
         setDailyMatchLimit(Number(result.data.dailyMatchLimit ?? 3));
+
+        const litIds = new Set<string>();
+        matchList.forEach((m) => {
+          if (m.isStarLit && m.chatDayCount && m.chatDayCount >= 1) {
+            litIds.add(m.id);
+          }
+        });
+        setNewlyLitStars(litIds);
+        setTimeout(() => setNewlyLitStars(new Set()), 2000);
       }
     } catch {
       setSeedError("网络异常，请刷新重试。");
@@ -173,13 +200,35 @@ export default function MatchesPage() {
   }, []);
 
   const handleDelete = (id: string) => {
-    if (!window.confirm("确定删除这个匹配吗？")) return;
-    fetch(`/api/matches/${id}`, { method: "DELETE", credentials: "include" })
+    if (!window.confirm("确定删除这个匹配吗？删除后将无法恢复。")) return;
+    setDeletingIds((prev) => new Set(prev).add(id));
+    fetch(`/api/matches/${id}/delete`, { method: "DELETE", credentials: "include" })
       .then((response) => response.json())
       .then((result) => {
-        if (result.code === 0) setList((prev) => prev.filter((item) => item.id !== id));
+        if (result.code === 0) {
+          setTimeout(() => {
+            setList((prev) => prev.filter((item) => item.id !== id));
+            setDeletingIds((prev) => {
+              const next = new Set(prev);
+              next.delete(id);
+              return next;
+            });
+          }, 500);
+        } else {
+          setDeletingIds((prev) => {
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+          });
+        }
       })
-      .catch(() => {});
+      .catch(() => {
+        setDeletingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      });
   };
 
   const seed = () => {
@@ -230,6 +279,30 @@ export default function MatchesPage() {
 
   return (
     <div className="page-shell min-h-screen">
+      <style jsx global>{`
+        @keyframes star-glow {
+          0%, 100% { filter: drop-shadow(0 0 4px var(--c-gold)); }
+          50% { filter: drop-shadow(0 0 12px var(--c-gold)); }
+        }
+        @keyframes fade-out {
+          from { opacity: 1; transform: translateX(0); }
+          to { opacity: 0; transform: translateX(60px); max-height: 0; padding-top: 0; padding-bottom: 0; margin-top: 0; margin-bottom: 0; overflow: hidden; }
+        }
+        .star-glowing {
+          animation: star-glow 1.5s ease-in-out infinite;
+        }
+        .match-card-deleting {
+          animation: fade-out 0.5s ease-out forwards;
+        }
+        @keyframes empty-float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-8px); }
+        }
+        .empty-float {
+          animation: empty-float 3s ease-in-out infinite;
+        }
+      `}</style>
+
       <AppHeader />
 
       <main className="relative mx-auto max-w-[780px] px-4 pb-10 pt-6">
@@ -385,54 +458,112 @@ export default function MatchesPage() {
           </div>
 
           {list.length === 0 ? (
-            <div className="rounded-3xl border-2 border-dashed border-[var(--ink)] bg-[var(--paper)] px-6 py-14 text-center shadow-[6px_6px_0_var(--ink)]">
-              <p className="text-lg font-black text-[var(--ink)]">匹配列表还是空的</p>
+            <div className="rounded-3xl border-2 border-dashed border-[var(--ink)] bg-[var(--card)] px-6 py-16 text-center shadow-[6px_6px_0_var(--ink)]">
+              <div className="empty-float mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full border-2 border-[var(--ink)] bg-[var(--brand)] shadow-[4px_4px_0_var(--ink)]">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="var(--ink)" aria-hidden="true">
+                  <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+              </div>
+              <p className="text-xl font-black text-[var(--ink)]">还没有匹配</p>
               <p className="mt-2 text-sm font-bold text-[var(--muted-ink)]">
-                点击“开始匹配”，让丘比先帮你挑出最值得认识的人。
+                点击上方「开始匹配」，让丘比帮你找到合拍的灵魂 ✨
+              </p>
+              <p className="mt-1 text-xs font-bold text-[var(--muted-ink)]">
+                每天都有新的缘分在等你
               </p>
             </div>
           ) : (
-            <div className="overflow-hidden rounded-3xl border-2 border-[var(--ink)] bg-[var(--paper)] shadow-[8px_8px_0_var(--ink)]">
-              {list.map((match, index) => (
-                <div
-                  key={match.id}
-                  className={`group flex items-center gap-3 px-4 py-4 transition hover:bg-[var(--paper-2)] ${
-                    index > 0 ? "border-t-2 border-[var(--ink)]" : ""
-                  }`}
-                >
-                  <button type="button" onClick={() => router.push(`/matches/${match.id}`)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-                    <div className="relative shrink-0">
-                      <Avatar src={match.targetUser.avatarUrl} name={match.targetUser.name ?? "?"} size={50} />
-                      {match.unreadCount > 0 ? (
-                        <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[var(--ink)] bg-[var(--love)] px-1 text-[10px] font-black text-white">
-                          {match.unreadCount > 9 ? "9+" : match.unreadCount}
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="truncate font-black text-[var(--ink)]">{match.targetUser.name ?? "未设置昵称"}</p>
-                        {match.status === "connected" ? (
-                          <span className="shrink-0 rounded-full bg-[var(--brand)] px-2 py-0.5 text-[10px] font-black text-[var(--ink)]">
-                            已连接
+            <div className="space-y-3">
+              {list.map((match) => {
+                const chatDays = match.chatDayCount ?? 0;
+                const isLit = chatDays >= 1;
+                const isNewlyLit = newlyLitStars.has(match.id);
+                const isDeleting = deletingIds.has(match.id);
+                const matchedDate = formatDate(match.createdAt);
+
+                return (
+                  <div
+                    key={match.id}
+                    className={`group relative overflow-hidden rounded-2xl border-2 border-[var(--ink)] bg-[var(--card)] shadow-[4px_4px_0_var(--ink)] transition hover:-translate-y-0.5 hover:shadow-[6px_6px_0_var(--ink)] ${
+                      isDeleting ? "match-card-deleting" : ""
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/matches/${match.id}`)}
+                      className="flex w-full items-center gap-3 px-4 py-4 text-left"
+                    >
+                      <div className="relative shrink-0">
+                        <Avatar src={match.targetUser.avatarUrl} name={match.targetUser.name ?? "?"} size={54} />
+                        {match.unreadCount > 0 ? (
+                          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[var(--ink)] bg-[var(--love)] px-1 text-[10px] font-black text-white">
+                            {match.unreadCount > 9 ? "9+" : match.unreadCount}
                           </span>
                         ) : null}
                       </div>
-                      <p className="mt-0.5 truncate text-sm font-bold text-[var(--muted-ink)]">
-                        {(match.targetUser.bio || match.matchReason || "查看这次合拍理由").slice(0, BIO_MAX)}
-                      </p>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(match.id)}
-                    className="shrink-0 rounded-xl border-2 border-transparent p-2 text-[var(--muted-ink)] transition hover:border-[var(--ink)] hover:bg-[var(--love)] hover:text-white"
-                    aria-label="删除匹配"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate font-black text-[var(--ink)]">{match.targetUser.name ?? "未设置昵称"}</p>
+                          {match.status === "connected" ? (
+                            <span className="shrink-0 rounded-full bg-[var(--brand)] px-2 py-0.5 text-[10px] font-black text-[var(--ink)]">
+                              已连接
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <p className="mt-0.5 truncate text-sm font-bold text-[var(--muted-ink)]">
+                          {(match.targetUser.bio || match.matchReason || "查看这次合拍理由").slice(0, BIO_MAX)}
+                        </p>
+
+                        <div className="mt-1.5 flex items-center gap-3">
+                          <span
+                            className={`inline-flex items-center gap-1 text-xs font-bold ${
+                              isLit ? "text-[var(--c-gold)]" : "text-[var(--muted-ink)]"
+                            } ${isNewlyLit ? "star-glowing" : ""}`}
+                          >
+                            {isLit ? (
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--c-gold)" aria-hidden="true">
+                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                              </svg>
+                            ) : (
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                              </svg>
+                            )}
+                            {chatDays > 0 ? `${chatDays}天` : "未聊天"}
+                          </span>
+
+                          {matchedDate ? (
+                            <span className="text-[10px] font-bold text-[var(--muted-ink)]">
+                              {matchedDate} 匹配
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(match.id);
+                      }}
+                      disabled={isDeleting}
+                      className="absolute right-3 top-3 shrink-0 rounded-xl border-2 border-transparent p-1.5 text-[var(--muted-ink)] opacity-0 transition hover:border-[var(--ink)] hover:bg-[var(--love)] hover:text-white group-hover:opacity-100"
+                      aria-label="删除匹配"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M3 6h18" />
+                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                        <line x1="10" y1="11" x2="10" y2="17" />
+                        <line x1="14" y1="11" x2="14" y2="17" />
+                      </svg>
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </section>
