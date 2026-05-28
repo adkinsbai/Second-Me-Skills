@@ -218,38 +218,50 @@ export function scoreCompatibility(a: UserModel, b: UserModel) {
   if (Math.abs(paceToNum(a.communicationPace) - paceToNum(b.communicationPace)) >= 2) {
     hardRejectReasons.push("沟通节奏差异过大");
   }
-  if (a.qualityScore < 45 || b.qualityScore < 45) {
+  if (a.qualityScore < 40 || b.qualityScore < 40) {
     hardRejectReasons.push("用户质量评分过低");
   }
   if (a.qualityFlags.includes("表达冒犯") || b.qualityFlags.includes("表达冒犯")) {
     hardRejectReasons.push("存在冒犯表达风险");
   }
 
-  const sim = (cosine(a.embedding1024, b.embedding1024) + 1) / 2;
+  // Raw cosine for non-negative bag-of-words vectors is already in [0, 1].
+  // Previous formula (cos+1)/2 mapped [0,1] -> [0.5,1], biasing every score +27.5.
+  const sim = cosine(a.embedding1024, b.embedding1024);
+
   const attachScore =
     a.attachmentType === b.attachmentType
-      ? 88
+      ? 90
       : (a.attachmentType === "secure" && b.attachmentType === "anxious") ||
           (a.attachmentType === "anxious" && b.attachmentType === "secure")
         ? 72
-        : 58;
-  const rhythmScore = clamp(
-    92 - Math.abs(paceToNum(a.communicationPace) - paceToNum(b.communicationPace)) * 22
-  );
-  const emotionScore = clamp(100 - Math.abs(a.emotionalStability - b.emotionalStability) * 0.9);
-  const valueScore = clamp(
-    100 -
-      (Math.abs(a.valuePriority.career - b.valuePriority.career) +
-        Math.abs(a.valuePriority.family - b.valuePriority.family) +
-        Math.abs(a.valuePriority.freedom - b.valuePriority.freedom) +
-        Math.abs(a.valuePriority.growth - b.valuePriority.growth)) /
-        8
+        : 55;
+
+  const paceDiff = Math.abs(paceToNum(a.communicationPace) - paceToNum(b.communicationPace));
+  const rhythmScore = clamp(95 - paceDiff * 24);
+
+  const emotionScore = clamp(100 - Math.abs(a.emotionalStability - b.emotionalStability) * 0.85);
+
+  const valueDiff =
+    Math.abs(a.valuePriority.career - b.valuePriority.career) +
+    Math.abs(a.valuePriority.family - b.valuePriority.family) +
+    Math.abs(a.valuePriority.freedom - b.valuePriority.freedom) +
+    Math.abs(a.valuePriority.growth - b.valuePriority.growth);
+  const valueScore = clamp(100 - valueDiff / 6);
+
+  // Hard reject on severe values conflict (must come before final score calc)
+  if (valueScore < 45) {
+    hardRejectReasons.push("价值观冲突明显");
+  }
+
+  // Rebalanced weights: vector 35%, attachment 20%, rhythm 18%, emotion 15%, values 12%
+  let finalScore = clamp(
+    sim * 35 + attachScore * 0.20 + rhythmScore * 0.18 + emotionScore * 0.15 + valueScore * 0.12
   );
 
-  let finalScore = clamp(sim * 55 + attachScore * 0.15 + rhythmScore * 0.13 + emotionScore * 0.09 + valueScore * 0.08);
-  if (hardRejectReasons.includes("沟通节奏差异过大")) finalScore = clamp(finalScore - 15);
-  if (valueScore < 55) hardRejectReasons.push("价值观冲突明显");
-  if (hardRejectReasons.includes("价值观冲突明显")) finalScore = clamp(finalScore - 25);
+  // Soft penalties for dimensions that are bad but didn't hard-reject
+  if (hardRejectReasons.includes("沟通节奏差异过大")) finalScore = clamp(finalScore - 12);
+  if (valueScore < 55) finalScore = clamp(finalScore - 8);
 
   return {
     finalScore: Math.round(finalScore),

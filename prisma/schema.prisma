@@ -134,6 +134,7 @@ model Session {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   @@map("sessions")
 }
 
@@ -180,6 +181,7 @@ model Match {
   feedbacks  MatchFeedback[]
   matchReads MatchRead[]     @relation("MatchReadMatch")
 
+  @@unique([userId, targetUserId])
   @@index([userId])
   @@index([targetUserId])
   @@map("matches")
@@ -247,6 +249,7 @@ model MatchRead {
   user  User  @relation("MatchReadUser", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([matchId, userId])
+  @@index([userId])
   @@map("match_reads")
 }
 

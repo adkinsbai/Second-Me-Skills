@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { createConnectedMatchPair, computeCompatibilityBetween } from "@/lib/matchCreation";
 import { MATCH_THRESHOLD } from "@/lib/matchPipeline";
 import { extractProfileTraits, type UserWithPreference } from "@/lib/matchStory";
+import { hitRateLimit } from "@/lib/rateLimit";
 
 function snapshotFor(user: UserWithPreference): Prisma.InputJsonValue {
   return {
@@ -21,6 +22,12 @@ function snapshotFor(user: UserWithPreference): Prisma.InputJsonValue {
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ code: 401 }, { status: 401 });
+
+  // Rate limit: max 60 swipes per 10 minutes per user
+  const rl = hitRateLimit(`swipe:${user.id}`, 60, 10 * 60 * 1000);
+  if (rl.limited) {
+    return NextResponse.json({ code: 429, message: "操作过于频繁，请稍后再试" }, { status: 429 });
+  }
 
   const body = await request.json().catch(() => ({}));
   const targetUserId = typeof body?.targetUserId === "string" ? body.targetUserId : "";
@@ -58,21 +65,32 @@ export async function POST(request: NextRequest) {
   let mutualLike = false;
   let compatibilityScore: number | null = null;
   if (action === "like") {
-    const reciprocal = await prisma.userSwipeDecision.findUnique({
-      where: { viewerId_targetUserId: { viewerId: targetUserId, targetUserId: user.id } },
-      select: { action: true },
-    });
-    if (reciprocal?.action === "like") {
-      mutualLike = true;
-      // Compute compatibility score before deciding to create match
-      compatibilityScore = await computeCompatibilityBetween(user.id, targetUserId);
-      if (compatibilityScore >= MATCH_THRESHOLD) {
-        const created = await createConnectedMatchPair(user.id, targetUserId);
-        mutualMatch = true;
-        matchId = created.matchId;
+    // Use transaction to prevent race condition on mutual like
+    await prisma.$transaction(async (tx) => {
+      const reciprocal = await tx.userSwipeDecision.findUnique({
+        where: { viewerId_targetUserId: { viewerId: targetUserId, targetUserId: user.id } },
+        select: { action: true },
+      });
+      if (reciprocal?.action === "like") {
+        mutualLike = true;
+        // Check if match already exists to prevent duplicates
+        const existingMatch = await tx.match.findFirst({
+          where: { userId: user.id, targetUserId },
+          select: { id: true },
+        });
+        if (!existingMatch) {
+          compatibilityScore = await computeCompatibilityBetween(user.id, targetUserId);
+          if (compatibilityScore >= MATCH_THRESHOLD) {
+            const created = await createConnectedMatchPair(user.id, targetUserId);
+            mutualMatch = true;
+            matchId = created.matchId;
+          }
+        } else {
+          matchId = existingMatch.id;
+          mutualMatch = true;
+        }
       }
-      // If score < MATCH_THRESHOLD, mutual like is recorded but no Match is created
-    }
+    });
   }
 
   return NextResponse.json({

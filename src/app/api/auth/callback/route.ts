@@ -29,7 +29,8 @@ export async function GET(request: NextRequest) {
   }
 
   const savedState = getOauthStateCookie();
-  if (savedState && state !== savedState) {
+  // Always validate state when cookie exists; reject if cookie missing (CSRF protection)
+  if (!savedState || state !== savedState) {
     clearOauthStateCookie();
     return NextResponse.redirect(new URL('/auth?error=oauth_state_mismatch', request.url));
   }

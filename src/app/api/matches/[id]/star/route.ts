@@ -1,25 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-
-function calcConsecutiveDays(dates: string[]): number {
-  if (dates.length === 0) return 0;
-  const sorted = Array.from(new Set(dates)).sort().reverse();
-  const today = new Date().toISOString().split("T")[0];
-  if (sorted[0] !== today) return 0;
-  let streak = 1;
-  for (let i = 1; i < sorted.length; i++) {
-    const prev = new Date(sorted[i - 1]);
-    const curr = new Date(sorted[i]);
-    const diff = (prev.getTime() - curr.getTime()) / (1000 * 60 * 60 * 24);
-    if (diff === 1) {
-      streak++;
-    } else {
-      break;
-    }
-  }
-  return streak;
-}
+import { computeStarStats, dateInTimezone } from "@/lib/starUtils";
 
 export async function GET(
   _request: Request,
@@ -34,6 +16,13 @@ export async function GET(
   });
   if (!match) return NextResponse.json({ code: 404, message: "匹配不存在" }, { status: 404 });
 
+  // Read user's timezone preference
+  const pref = await prisma.userPreference.findUnique({
+    where: { userId: user.id },
+    select: { dailyMatchTimezone: true },
+  });
+  const tz = pref?.dailyMatchTimezone ?? "Asia/Shanghai";
+
   const messages = await prisma.matchMessage.findMany({
     where: {
       matchId,
@@ -43,19 +32,21 @@ export async function GET(
     orderBy: { createdAt: "asc" },
   });
 
-  const chatDates = messages.map((m) => m.createdAt.toISOString().split("T")[0]);
-  const chatDayCount = new Set(chatDates).size;
-  const starDays = calcConsecutiveDays(chatDates);
-  const starLitAt = chatDayCount >= 1 && match.starLitAt ? match.starLitAt.toISOString() : chatDayCount >= 1 ? new Date().toISOString() : null;
-  const isStarLit = chatDayCount >= 1;
+  const chatDates = messages.map((m) => dateInTimezone(m.createdAt, tz));
+  const stats = computeStarStats(chatDates, match.starLitAt, tz);
+
+  // Persist computed stats back to match record
+  await prisma.match.update({
+    where: { id: matchId },
+    data: {
+      starDays: stats.starDays,
+      chatDayCount: stats.chatDayCount,
+      starLitAt: stats.starLitAt ? new Date(stats.starLitAt) : null,
+    },
+  });
 
   return NextResponse.json({
     code: 0,
-    data: {
-      starDays,
-      starLitAt,
-      chatDayCount,
-      isStarLit,
-    },
+    data: stats,
   });
 }

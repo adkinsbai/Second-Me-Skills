@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { appendOwnerFact } from "@/lib/ownerInformation";
 import { excerptForOwnerLearning } from "@/lib/humanChatLearning";
+import { hitRateLimit } from "@/lib/rateLimit";
 
 export async function GET(
   request: NextRequest,
@@ -99,6 +100,11 @@ export async function POST(
 ) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ code: 401 }, { status: 401 });
+  // Rate limit: max 60 messages per 5 minutes per user
+  const rl = hitRateLimit(`chat:${user.id}`, 60, 5 * 60 * 1000);
+  if (rl.limited) {
+    return NextResponse.json({ code: 429, message: "发送过于频繁，请稍后再试" }, { status: 429 });
+  }
   const { id: matchId } = params;
   const match = await prisma.match.findFirst({
     where: { id: matchId, userId: user.id },
@@ -107,10 +113,10 @@ export async function POST(
   if (match.status !== "connected") {
     return NextResponse.json({ code: 403, message: "请先解锁与对方的聊天" }, { status: 403 });
   }
-  const body = await request.json();
+  const body = await request.json().catch(() => ({}));
   const content = String(body?.content ?? "").trim();
   if (!content) return NextResponse.json({ code: 400 }, { status: 400 });
-  const safeContent = content.slice(0, 200000);
+  const safeContent = content.slice(0, 10000);
   const msg = await prisma.matchMessage.create({
     data: { matchId, senderType: "user_self", content: safeContent },
   });
