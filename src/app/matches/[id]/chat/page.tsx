@@ -20,9 +20,8 @@ import {
 } from "@/components/ChatBubble";
 import { IMAGE_DATA_PREFIX } from "@/lib/utils";
 import {
-  loadReactions,
-  saveReactions,
-  toggleReaction,
+  fetchReactions,
+  toggleReactionServer,
   type ReactionMap,
 } from "@/components/MessageReactions";
 
@@ -175,10 +174,10 @@ export default function HumanChatPage() {
     if (result?.code === 0) setGuidance(result.data);
   }, [id]);
 
-  // Load reactions from localStorage
+  // Load reactions from server
   useEffect(() => {
     if (id) {
-      setReactionsState(loadReactions(id));
+      fetchReactions(id).then((data) => setReactionsState(data));
     }
   }, [id]);
 
@@ -424,13 +423,25 @@ export default function HumanChatPage() {
   }, []);
 
   const handleReaction = useCallback(
-    (messageId: string, emoji: string) => {
+    async (messageId: string, emoji: string) => {
       if (!id) return;
+      // Optimistic update
       setReactionsState((prev) => {
-        const next = toggleReaction(prev, messageId, emoji, "self");
-        saveReactions(id, next);
-        return next;
+        const current = prev[messageId]?.[emoji] ?? [];
+        const isReacted = current.includes("self");
+        const nextUsers = isReacted
+          ? current.filter((u) => u !== "self")
+          : [...current, "self"];
+        const msgReactions = { ...(prev[messageId] ?? {}) };
+        if (nextUsers.length > 0) {
+          msgReactions[emoji] = nextUsers;
+        } else {
+          delete msgReactions[emoji];
+        }
+        return { ...prev, [messageId]: msgReactions };
       });
+      // Persist to server
+      await toggleReactionServer(id, messageId, emoji);
     },
     [id]
   );

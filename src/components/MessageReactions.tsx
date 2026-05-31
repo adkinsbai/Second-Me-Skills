@@ -71,7 +71,7 @@ export function ReactionBadges({
 }
 
 /**
- * Client-side reaction storage using localStorage.
+ * Client-side reaction storage using localStorage (legacy fallback).
  * Key: `reactions_${matchId}` -> Record<messageId, ReactionMap>
  */
 export function loadReactions(matchId: string): Record<string, ReactionMap> {
@@ -91,6 +91,45 @@ export function saveReactions(matchId: string, data: Record<string, ReactionMap>
   } catch {
     // ignore
   }
+}
+
+/**
+ * Server-side reaction fetch — loads reactions from the database via API.
+ * Returns Record<messageId, ReactionMap>.
+ */
+export async function fetchReactions(matchId: string): Promise<Record<string, ReactionMap>> {
+  try {
+    const res = await fetch(`/api/matches/${matchId}/reactions`, { credentials: "include" });
+    const json = await res.json().catch(() => null);
+    if (json?.code === 0 && json.data) return json.data as Record<string, ReactionMap>;
+  } catch {
+    // fall through
+  }
+  return {};
+}
+
+/**
+ * Server-side reaction toggle — sends a reaction toggle to the API.
+ * Returns the action taken: "added" or "removed".
+ */
+export async function toggleReactionServer(
+  matchId: string,
+  messageId: string,
+  emoji: string
+): Promise<"added" | "removed" | null> {
+  try {
+    const res = await fetch(`/api/matches/${matchId}/reactions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ messageId, emoji }),
+    });
+    const json = await res.json().catch(() => null);
+    if (json?.code === 0 && json.data?.action) return json.data.action as "added" | "removed";
+  } catch {
+    // fall through
+  }
+  return null;
 }
 
 export function toggleReaction(

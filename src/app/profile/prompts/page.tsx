@@ -15,24 +15,7 @@ const PROMPTS = [
   { id: "superpower", question: "我的超能力是", icon: "⚡", placeholder: "比如：永远能找到好吃的店" },
 ];
 
-const STORAGE_KEY = "qiubi_profile_prompts";
-
 type PromptAnswers = Record<string, string>;
-
-function loadAnswers(): PromptAnswers {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveAnswers(answers: PromptAnswers) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(answers));
-}
 
 export default function ProfilePromptsPage() {
   const router = useRouter();
@@ -40,9 +23,23 @@ export default function ProfilePromptsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
 
+  // Load from server on mount
   useEffect(() => {
-    setAnswers(loadAnswers());
+    fetch("/api/user/prompts", { credentials: "include" })
+      .then((r) => r.json())
+      .then((result) => {
+        if (result?.code === 0 && Array.isArray(result.data)) {
+          const map: PromptAnswers = {};
+          for (const p of result.data) {
+            if (p.promptKey && p.answer) map[p.promptKey] = p.answer;
+          }
+          setAnswers(map);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   const startEdit = useCallback(
@@ -53,20 +50,39 @@ export default function ProfilePromptsPage() {
     [answers]
   );
 
-  const saveEdit = useCallback(() => {
+  const saveEdit = useCallback(async () => {
     if (!editingId) return;
     const trimmed = editValue.trim();
-    const next = { ...answers };
-    if (trimmed) {
-      next[editingId] = trimmed;
-    } else {
-      delete next[editingId];
+    setSaving(true);
+    try {
+      if (trimmed) {
+        // Save to server
+        const res = await fetch("/api/user/prompts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ promptKey: editingId, answer: trimmed }),
+        });
+        const result = await res.json().catch(() => null);
+        if (result?.code === 0) {
+          setAnswers((prev) => ({ ...prev, [editingId]: trimmed }));
+        }
+      } else {
+        // Empty answer = delete (POST empty string to remove)
+        setAnswers((prev) => {
+          const next = { ...prev };
+          delete next[editingId];
+          return next;
+        });
+      }
+    } catch {
+      // ignore
+    } finally {
+      setSaving(false);
+      setEditingId(null);
+      setEditValue("");
     }
-    setAnswers(next);
-    saveAnswers(next);
-    setEditingId(null);
-    setEditValue("");
-  }, [editingId, editValue, answers]);
+  }, [editingId, editValue]);
 
   const answeredCount = Object.keys(answers).length;
 
@@ -93,82 +109,89 @@ export default function ProfilePromptsPage() {
           </div>
         </section>
 
-        <div className="space-y-3">
-          {PROMPTS.map((prompt) => {
-            const answer = answers[prompt.id];
-            const isEditing = editingId === prompt.id;
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <div className="h-6 w-6 animate-spin rounded-full border-4 border-[var(--ink)] border-t-[var(--brand)]" />
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {PROMPTS.map((prompt) => {
+              const answer = answers[prompt.id];
+              const isEditing = editingId === prompt.id;
 
-            return (
-              <div
-                key={prompt.id}
-                className={`rounded-2xl border-2 border-[var(--ink)] p-4 shadow-[4px_4px_0_var(--ink)] transition ${
-                  answer ? "bg-[var(--card)]" : "bg-[var(--paper)]"
-                }`}
-              >
-                {isEditing ? (
-                  <div className="space-y-3">
-                    <p className="text-xs font-black text-[var(--ink)]">
-                      {prompt.icon} {prompt.question}
-                    </p>
-                    <textarea
-                      value={editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      placeholder={prompt.placeholder}
-                      rows={2}
-                      autoFocus
-                      className="luxury-input w-full px-3 py-2 text-sm"
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={saveEdit}
-                        className="luxury-btn px-4 py-1.5 text-xs"
-                      >
-                        保存
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingId(null);
-                          setEditValue("");
-                        }}
-                        className="luxury-btn-secondary px-4 py-1.5 text-xs"
-                      >
-                        取消
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => startEdit(prompt.id)}
-                    className="w-full text-left"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-xs font-black text-[var(--ink)]/60">
-                          {prompt.icon} {prompt.question}
-                        </p>
-                        {answer ? (
-                          <p className="mt-1 text-sm font-bold text-[var(--ink)]">
-                            {answer}
-                          </p>
-                        ) : (
-                          <p className="mt-1 text-sm font-bold text-[var(--muted-ink)] italic">
-                            点击添加回答...
-                          </p>
-                        )}
+              return (
+                <div
+                  key={prompt.id}
+                  className={`rounded-2xl border-2 border-[var(--ink)] p-4 shadow-[4px_4px_0_var(--ink)] transition ${
+                    answer ? "bg-[var(--card)]" : "bg-[var(--paper)]"
+                  }`}
+                >
+                  {isEditing ? (
+                    <div className="space-y-3">
+                      <p className="text-xs font-black text-[var(--ink)]">
+                        {prompt.icon} {prompt.question}
+                      </p>
+                      <textarea
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        placeholder={prompt.placeholder}
+                        rows={2}
+                        autoFocus
+                        className="luxury-input w-full px-3 py-2 text-sm"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={saveEdit}
+                          disabled={saving}
+                          className="luxury-btn px-4 py-1.5 text-xs disabled:opacity-50"
+                        >
+                          {saving ? "保存中..." : "保存"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingId(null);
+                            setEditValue("");
+                          }}
+                          className="luxury-btn-secondary px-4 py-1.5 text-xs"
+                        >
+                          取消
+                        </button>
                       </div>
-                      <span className="shrink-0 rounded-lg border-2 border-[var(--ink)] bg-[var(--brand)] px-2 py-0.5 text-[10px] font-black shadow-[2px_2px_0_var(--ink)]">
-                        {answer ? "编辑" : "添加"}
-                      </span>
                     </div>
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => startEdit(prompt.id)}
+                      className="w-full text-left"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-black text-[var(--ink)]/60">
+                            {prompt.icon} {prompt.question}
+                          </p>
+                          {answer ? (
+                            <p className="mt-1 text-sm font-bold text-[var(--ink)]">
+                              {answer}
+                            </p>
+                          ) : (
+                            <p className="mt-1 text-sm font-bold text-[var(--muted-ink)] italic">
+                              点击添加回答...
+                            </p>
+                          )}
+                        </div>
+                        <span className="shrink-0 rounded-lg border-2 border-[var(--ink)] bg-[var(--brand)] px-2 py-0.5 text-[10px] font-black shadow-[2px_2px_0_var(--ink)]">
+                          {answer ? "编辑" : "添加"}
+                        </span>
+                      </div>
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         <div className="mt-6 flex justify-center">
           <button

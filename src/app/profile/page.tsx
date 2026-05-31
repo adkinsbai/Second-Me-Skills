@@ -71,13 +71,27 @@ export default function ProfilePage() {
       .catch(() => null)
       .finally(() => setLoading(false));
 
-    // Load prompt answers from localStorage
-    try {
-      const raw = localStorage.getItem(PROMPT_STORAGE_KEY);
-      if (raw) setPromptAnswers(JSON.parse(raw));
-    } catch {
-      // ignore
-    }
+    // Load prompt answers from server API
+    fetch("/api/user/prompts", { credentials: "include" })
+      .then((r) => r.json())
+      .then((result) => {
+        if (result?.code === 0 && Array.isArray(result.data)) {
+          const map: Record<string, string> = {};
+          for (const p of result.data) {
+            if (p.promptKey && p.answer) map[p.promptKey] = p.answer;
+          }
+          setPromptAnswers(map);
+        }
+      })
+      .catch(() => {
+        // Fallback: try localStorage
+        try {
+          const raw = localStorage.getItem(PROMPT_STORAGE_KEY);
+          if (raw) setPromptAnswers(JSON.parse(raw));
+        } catch {
+          // ignore
+        }
+      });
   }, []);
 
   const handleFile = async (index: number, files: FileList | null) => {

@@ -31,6 +31,7 @@ async function handleDailyRecommendations(request: NextRequest) {
   });
 
   let processedCount = 0;
+  let matchCreatedCount = 0;
 
   for (const pref of preferences) {
     const userId = pref.user.id;
@@ -50,6 +51,13 @@ async function handleDailyRecommendations(request: NextRequest) {
     const excludeIds = swipedIds.map((s) => s.targetUserId);
     excludeIds.push(userId); // 排除自己
 
+    // Also exclude users already matched with
+    const existingMatches = await prisma.match.findMany({
+      where: { userId },
+      select: { targetUserId: true },
+    });
+    for (const m of existingMatches) excludeIds.push(m.targetUserId);
+
     // 基础筛选条件
     const where: Record<string, unknown> = {
       id: { notIn: excludeIds },
@@ -66,7 +74,7 @@ async function handleDailyRecommendations(request: NextRequest) {
       where.age = { ...((where.age as Record<string, number>) ?? {}), lte: pref.ageMax };
     }
 
-    // 简单推荐：随机取 5 个
+    // 简单推荐：按人气取 5 个
     const candidates = await prisma.user.findMany({
       where,
       select: { id: true },
@@ -75,8 +83,45 @@ async function handleDailyRecommendations(request: NextRequest) {
     });
 
     if (candidates.length > 0) {
-      // 这里可以扩展为发送通知、创建推荐记录等
-      console.log(`[daily-recommendations] User ${userId} got ${candidates.length} candidates`);
+      // Create actual match records for top candidate
+      const topCandidate = candidates[0];
+
+      // Create a match record (screening status = pending user action)
+      try {
+        await prisma.match.create({
+          data: {
+            userId,
+            targetUserId: topCandidate.id,
+            status: "daily_recommendation",
+          },
+        });
+        matchCreatedCount++;
+      } catch {
+        // May fail due to unique constraint if already exists — skip
+      }
+
+      // Also record swipe decisions for the other candidates so they appear in discovery
+      for (let i = 1; i < candidates.length; i++) {
+        try {
+          await prisma.userSwipeDecision.upsert({
+            where: {
+              viewerId_targetUserId: {
+                viewerId: userId,
+                targetUserId: candidates[i].id,
+              },
+            },
+            update: {},
+            create: {
+              viewerId: userId,
+              targetUserId: candidates[i].id,
+              action: "recommend",
+              source: "daily_cron",
+            },
+          });
+        } catch {
+          // ignore
+        }
+      }
     }
 
     processedCount++;
@@ -85,6 +130,6 @@ async function handleDailyRecommendations(request: NextRequest) {
   return NextResponse.json({
     code: 0,
     message: `处理完成`,
-    data: { processedCount },
+    data: { processedCount, matchCreatedCount },
   });
 }

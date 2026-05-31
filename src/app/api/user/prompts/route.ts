@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { checkAchievements } from "@/lib/achievements";
 
 // GET /api/user/prompts — 获取当前用户的所有 profile prompts
 export async function GET() {
@@ -42,6 +43,9 @@ export async function POST(request: NextRequest) {
 
   // 更新 profile completeness
   await updateProfileCompleteness(user.id);
+
+  // Check achievements after prompt save
+  await checkAchievements(user.id).catch(() => {});
 
   return NextResponse.json({ code: 0, data: prompt });
 }

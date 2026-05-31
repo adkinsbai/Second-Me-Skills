@@ -8,69 +8,49 @@ import {
   type UserAchievement,
 } from "@/components/AchievementBadge";
 
-const STORAGE_KEY = "qiubi_achievements";
-
-function loadUserAchievements(): Record<string, UserAchievement> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
+type ServerAchievement = {
+  badgeKey: string;
+  unlockedAt: string;
+};
 
 export default function AchievementsPage() {
   const [userAchs, setUserAchs] = useState<Record<string, UserAchievement>>({});
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = loadUserAchievements();
-
-    // Initialize defaults for any missing achievements
-    let changed = false;
-    ACHIEVEMENT_DEFS.forEach((def) => {
-      if (!stored[def.id]) {
-        stored[def.id] = { id: def.id, progress: 0, unlocked: false };
-        changed = true;
-      }
-    });
-
-    // Demo: auto-detect some achievements based on localStorage data
-    try {
-      // Check-in streak
-      const checkinRaw = localStorage.getItem("qiubi_checkin_data");
-      if (checkinRaw) {
-        const checkin = JSON.parse(checkinRaw);
-        if (checkin.dates?.length > 0) {
-          const checkinAch = stored["checkin_streak"];
-          if (checkinAch && !checkinAch.unlocked) {
-            // Count streak
-            const sorted = [...checkin.dates].sort().reverse();
-            let streak = 0;
-            const today = new Date();
-            for (let i = 0; i < 30; i++) {
-              const d = new Date(today.getTime() - i * 86400000);
-              const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-              if (sorted.includes(ds)) streak++;
-              else break;
+    // Fetch achievements from server API
+    fetch("/api/achievements", { credentials: "include" })
+      .then((r) => r.json())
+      .then((result) => {
+        if (result?.code === 0 && Array.isArray(result.data)) {
+          const map: Record<string, UserAchievement> = {};
+          // Initialize all as locked
+          ACHIEVEMENT_DEFS.forEach((def) => {
+            map[def.id] = { id: def.id, progress: 0, unlocked: false };
+          });
+          // Mark unlocked ones from server
+          for (const ach of result.data as ServerAchievement[]) {
+            if (map[ach.badgeKey]) {
+              map[ach.badgeKey] = {
+                id: ach.badgeKey,
+                progress: ACHIEVEMENT_DEFS.find((d) => d.id === ach.badgeKey)?.target ?? 1,
+                unlocked: true,
+                unlockedAt: ach.unlockedAt,
+              };
             }
-            checkinAch.progress = streak;
-            if (streak >= 7) {
-              checkinAch.unlocked = true;
-              checkinAch.unlockedAt = new Date().toISOString();
-            }
-            changed = true;
           }
+          setUserAchs(map);
         }
-      }
-    } catch {
-      // ignore
-    }
-
-    if (changed) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
-    }
-    setUserAchs(stored);
+      })
+      .catch(() => {
+        // Initialize defaults on error
+        const map: Record<string, UserAchievement> = {};
+        ACHIEVEMENT_DEFS.forEach((def) => {
+          map[def.id] = { id: def.id, progress: 0, unlocked: false };
+        });
+        setUserAchs(map);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const unlocked = Object.values(userAchs).filter((a) => a.unlocked).length;
@@ -97,15 +77,21 @@ export default function AchievementsPage() {
           </div>
         </section>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {ACHIEVEMENT_DEFS.map((def) => (
-            <AchievementBadge
-              key={def.id}
-              def={def}
-              userAch={userAchs[def.id]}
-            />
-          ))}
-        </div>
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <div className="h-6 w-6 animate-spin rounded-full border-4 border-[var(--ink)] border-t-[var(--brand)]" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {ACHIEVEMENT_DEFS.map((def) => (
+              <AchievementBadge
+                key={def.id}
+                def={def}
+                userAch={userAchs[def.id]}
+              />
+            ))}
+          </div>
+        )}
       </main>
     </div>
   );

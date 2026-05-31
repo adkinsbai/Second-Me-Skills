@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { checkAchievements } from "@/lib/achievements";
 
 // POST /api/user/check-in — 每日签到，连续签到 +1，断签重置
 export async function POST() {
@@ -32,6 +33,8 @@ export async function POST() {
         where: { id: user.id },
         data: { dailyStreak: newStreak, lastCheckIn: now },
       });
+      // Check achievements after check-in
+      await checkAchievements(user.id).catch(() => {});
       return NextResponse.json({ code: 0, message: "签到成功", data: { dailyStreak: newStreak, alreadyCheckedIn: false } });
     }
 
@@ -40,6 +43,7 @@ export async function POST() {
       where: { id: user.id },
       data: { dailyStreak: 1, lastCheckIn: now },
     });
+    await checkAchievements(user.id).catch(() => {});
     return NextResponse.json({ code: 0, message: "签到成功（断签重置）", data: { dailyStreak: 1, alreadyCheckedIn: false } });
   }
 
@@ -48,5 +52,6 @@ export async function POST() {
     where: { id: user.id },
     data: { dailyStreak: 1, lastCheckIn: now },
   });
+  await checkAchievements(user.id).catch(() => {});
   return NextResponse.json({ code: 0, message: "首次签到成功", data: { dailyStreak: 1, alreadyCheckedIn: false } });
 }

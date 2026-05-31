@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 
-// In-memory typing status store (ephemeral, resets on server restart)
+// In-memory typing status store.
+// ⚠️ PRODUCTION LIMITATION: On Vercel/serverless, each invocation may run on
+// a different instance, so this Map is NOT shared across requests. This means
+// typing indicators will be unreliable on serverless platforms.
+// For production, use Redis (e.g., Upstash) or a similar shared store:
+//   import { Redis } from "@upstash/redis";
+//   const redis = Redis.fromEnv();
+//   await redis.set(`typing:${matchId}:${userId}`, "1", { ex: 5 });
+// For single-instance deployments (Docker, VPS), this in-memory approach works fine.
 const typingMap = new Map<string, { userId: string; timestamp: number }>();
 const TYPING_TTL = 5000; // 5 seconds
 

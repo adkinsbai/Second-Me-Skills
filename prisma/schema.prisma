@@ -73,6 +73,7 @@ model User {
   profileViewsGiven      ProfileView[]       @relation("ProfileViewViewer")
   profileViewsReceived   ProfileView[]       @relation("ProfileViewed")
   userEvents             UserEvent[]
+  messageReactions       MessageReaction[]
 
   @@map("users")
 }
@@ -225,6 +226,8 @@ model MatchMessage {
   createdAt  DateTime @default(now()) @map("created_at")
 
   match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  reactions MessageReaction[]
 
   @@index([matchId])
   @@index([matchId, createdAt])
@@ -455,4 +458,19 @@ model UserEvent {
   @@index([eventType, createdAt])
   @@index([userId, createdAt])
   @@map("user_events")
+}
+
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String   @map("message_id")
+  userId    String   @map("user_id")
+  emoji     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  message MatchMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+  @@map("message_reactions")
 }

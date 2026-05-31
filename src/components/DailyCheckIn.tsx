@@ -2,27 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-const CHECKIN_KEY = "qiubi_checkin_data";
-
 type CheckInData = {
   dates: string[]; // ISO date strings "YYYY-MM-DD"
   lastCheckIn: string | null;
 };
-
-function loadCheckInData(): CheckInData {
-  if (typeof window === "undefined") return { dates: [], lastCheckIn: null };
-  try {
-    const raw = localStorage.getItem(CHECKIN_KEY);
-    return raw ? JSON.parse(raw) : { dates: [], lastCheckIn: null };
-  } catch {
-    return { dates: [], lastCheckIn: null };
-  }
-}
-
-function saveCheckInData(data: CheckInData) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(CHECKIN_KEY, JSON.stringify(data));
-}
 
 function todayStr(): string {
   const d = new Date();
@@ -57,26 +40,68 @@ export function DailyCheckIn({ compact = false }: { compact?: boolean }) {
   const [data, setData] = useState<CheckInData>({ dates: [], lastCheckIn: null });
   const [justChecked, setJustChecked] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [loading, setLoading] = useState(false);
 
+  // Load from server on mount
   useEffect(() => {
-    setData(loadCheckInData());
     setMounted(true);
+    // Try to fetch server-side streak data
+    fetch("/api/user/stats", { credentials: "include" })
+      .then((r) => r.json())
+      .then((result) => {
+        if (result?.code === 0 && result?.data) {
+          const { dailyStreak, lastCheckIn } = result.data;
+          // Build dates array from streak info (best effort)
+          const dates: string[] = [];
+          if (dailyStreak > 0 && lastCheckIn) {
+            const last = new Date(lastCheckIn);
+            for (let i = 0; i < dailyStreak; i++) {
+              const d = new Date(last.getTime() - i * 86400000);
+              dates.push(
+                `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+              );
+            }
+          }
+          setData({
+            dates,
+            lastCheckIn: lastCheckIn
+              ? `${new Date(lastCheckIn).getFullYear()}-${String(new Date(lastCheckIn).getMonth() + 1).padStart(2, "0")}-${String(new Date(lastCheckIn).getDate()).padStart(2, "0")}`
+              : null,
+          });
+        }
+      })
+      .catch(() => {
+        // Fallback: no data
+      });
   }, []);
 
   const isCheckedToday = mounted && data.dates.includes(todayStr());
   const streak = mounted ? getStreak(data.dates) : 0;
 
-  const checkIn = useCallback(() => {
-    const today = todayStr();
-    const current = loadCheckInData();
-    if (current.dates.includes(today)) return;
-    current.dates.push(today);
-    current.lastCheckIn = today;
-    saveCheckInData(current);
-    setData(current);
-    setJustChecked(true);
-    setTimeout(() => setJustChecked(false), 3000);
-  }, []);
+  const checkIn = useCallback(async () => {
+    if (isCheckedToday || loading) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/user/check-in", {
+        method: "POST",
+        credentials: "include",
+      });
+      const result = await res.json().catch(() => null);
+      if (result?.code === 0) {
+        const today = todayStr();
+        setData((prev) => ({
+          dates: prev.dates.includes(today) ? prev.dates : [...prev.dates, today],
+          lastCheckIn: today,
+        }));
+        setJustChecked(true);
+        setTimeout(() => setJustChecked(false), 3000);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  }, [isCheckedToday, loading]);
 
   // Generate calendar grid for current month
   const now = new Date();
@@ -101,14 +126,14 @@ export function DailyCheckIn({ compact = false }: { compact?: boolean }) {
         <button
           type="button"
           onClick={checkIn}
-          disabled={isCheckedToday}
+          disabled={isCheckedToday || loading}
           className={`rounded-xl border-2 border-[var(--ink)] px-3 py-1.5 text-xs font-black shadow-[3px_3px_0_var(--ink)] transition active:translate-x-0.5 active:translate-y-0.5 ${
             isCheckedToday
               ? "bg-[var(--paper-2)] text-[var(--muted-ink)]"
               : "bg-[var(--brand)] text-[var(--ink)] hover:-translate-y-0.5"
           }`}
         >
-          {isCheckedToday ? "已签到" : "签到"}
+          {isCheckedToday ? "已签到" : loading ? "..." : "签到"}
         </button>
       </div>
     );
@@ -130,14 +155,14 @@ export function DailyCheckIn({ compact = false }: { compact?: boolean }) {
         <button
           type="button"
           onClick={checkIn}
-          disabled={isCheckedToday}
+          disabled={isCheckedToday || loading}
           className={`rounded-xl border-2 border-[var(--ink)] px-4 py-2 text-xs font-black shadow-[3px_3px_0_var(--ink)] transition active:translate-x-0.5 active:translate-y-0.5 ${
             isCheckedToday
               ? "bg-[var(--paper-2)] text-[var(--muted-ink)]"
               : "bg-[var(--brand)] text-[var(--ink)] hover:-translate-y-0.5"
           }`}
         >
-          {isCheckedToday ? "✓ 已签到" : "签到"}
+          {isCheckedToday ? "✓ 已签到" : loading ? "签到中..." : "签到"}
         </button>
       </div>
 
