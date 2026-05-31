@@ -62,10 +62,9 @@ export function AppHeaderNavRight({ onLogout }: AppHeaderNavRightProps = {}) {
   );
 }
 
-type Props = { title?: string; backHref?: string; right?: ReactNode };
-
+type Props = { title?: ReactNode; backHref?: string; right?: ReactNode };
 export function AppHeader({ title, backHref, right }: Props) {
-  const showTitle = typeof title === "string" && title.trim().length > 0;
+  const showTitle = title != null && (typeof title === "string" ? title.trim().length > 0 : true);
 
   return (
     <header className="sticky top-0 z-20 border-b-2 border-[var(--ink)] bg-[var(--paper)]/90 backdrop-blur-xl">

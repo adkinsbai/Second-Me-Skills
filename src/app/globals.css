@@ -279,10 +279,11 @@ header a.group span {
 
 /* ─── Chat ── */
 .chat-shell{height:100dvh;max-height:100dvh;background:var(--bg)}
+.chat-shell{position:relative}
 .chat-messages{scroll-behavior:smooth;-webkit-overflow-scrolling:touch}
 @keyframes bubble-in-left {from{opacity:0;transform:translateX(-12px) scale(.96)}to{opacity:1;transform:translateX(0) scale(1)}}
 @keyframes bubble-in-right{from{opacity:0;transform:translateX(12px) scale(.96)}to{opacity:1;transform:translateX(0) scale(1)}}
-.chat-bubble-row {animation-duration:220ms;animation-timing-function:cubic-bezier(.34,1.18,.64,1);animation-fill-mode:both}
+.chat-bubble-row {animation-duration:260ms;animation-timing-function:cubic-bezier(.34,1.28,.64,1);animation-fill-mode:both}
 .chat-bubble-self {animation-name:bubble-in-right}
 .chat-bubble-other{animation-name:bubble-in-left}
 .chat-bubble-self::after {content:"";position:absolute;bottom:6px;right:-7px;border:6px solid transparent;border-left:8px solid rgba(29,255,143,.88)}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { IMAGE_DATA_PREFIX } from "@/lib/utils";
 import {
   ReactionPicker,
@@ -16,7 +16,11 @@ export type BubbleMsg = {
   readByOther?: boolean;
   pending?: boolean;
   failed?: boolean;
+  replyToId?: string;
 };
+
+/** Position of this bubble within a consecutive group from the same sender. */
+export type BubblePosition = "single" | "first" | "middle" | "last";
 
 function Initials({ name }: { name: string }) {
   const ch = name.trim()[0] ?? "Q";
@@ -97,16 +101,127 @@ function renderContent(content: string) {
   );
 }
 
-export function ChatTimeDivider({ label }: { label: string }) {
+export function ChatTimeDivider({ label, subLabel }: { label: string; subLabel?: string }) {
   return (
-    <div className="flex items-center gap-3 py-3">
-      <div className="h-0.5 flex-1 bg-[var(--ink)]/20" />
-      <span className="rounded-full border-2 border-[var(--ink)] bg-[var(--paper)] px-3 py-1 text-[11px] font-black shadow-[2px_2px_0_var(--ink)]">
-        {label}
-      </span>
-      <div className="h-0.5 flex-1 bg-[var(--ink)]/20" />
+    <div className="flex flex-col items-center gap-1 py-3">
+      {subLabel && (
+        <span className="rounded-full border-2 border-[var(--ink)] bg-[var(--brand)] px-3 py-0.5 text-[10px] font-black text-[var(--ink)] shadow-[2px_2px_0_var(--ink)]">
+          {subLabel}
+        </span>
+      )}
+      <div className="flex w-full items-center gap-3">
+        <div className="h-0.5 flex-1 bg-[var(--ink)]/20" />
+        <span className="whitespace-nowrap rounded-full border-2 border-[var(--ink)] bg-[var(--paper)] px-3 py-1 text-[11px] font-black shadow-[2px_2px_0_var(--ink)]">
+          {label}
+        </span>
+        <div className="h-0.5 flex-1 bg-[var(--ink)]/20" />
+      </div>
     </div>
   );
+}
+
+/** Context menu for long-press / right-click on a message. */
+function MessageContextMenu({
+  isSelf,
+  onReply,
+  onCopy,
+  onReact,
+  onDelete,
+  onClose,
+}: {
+  isSelf: boolean;
+  onReply: () => void;
+  onCopy: () => void;
+  onReact: () => void;
+  onDelete?: () => void;
+  onClose: () => void;
+}) {
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        onClose();
+      };
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [onClose]);
+
+  const items: Array<{ icon: string; label: string; action: () => void; danger?: boolean }> = [
+    { icon: "↩️", label: "回复", action: onReply },
+    { icon: "📋", label: "复制", action: onCopy },
+    { icon: "😊", label: "回应", action: onReact },
+  ];
+  if (isSelf && onDelete) {
+    items.push({ icon: "🗑️", label: "删除", action: onDelete, danger: true });
+  }
+
+  return (
+    <div
+      ref={menuRef}
+      className="absolute z-40 flex gap-1 rounded-2xl border-2 border-[var(--ink)] bg-[var(--paper)] p-1.5 shadow-[4px_4px_0_var(--ink)]"
+      style={{ top: -8, right: isSelf ? 0 : "auto", left: isSelf ? "auto" : 0 }}
+    >
+      {items.map((item) => (
+        <button
+          key={item.label}
+          type="button"
+          onClick={() => {
+            item.action();
+            onClose();
+          }}
+          className={`flex flex-col items-center gap-0.5 rounded-xl px-2.5 py-1.5 text-[10px] font-bold transition hover:bg-[var(--brand)] ${
+            item.danger ? "hover:bg-[var(--love)]" : ""
+          }`}
+          title={item.label}
+        >
+          <span className="text-base">{item.icon}</span>
+          <span>{item.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Reply preview strip shown inside a bubble. */
+function ReplyPreview({ replyMsg }: { replyMsg: BubbleMsg | undefined }) {
+  if (!replyMsg) return null;
+  const preview = replyMsg.content.startsWith(IMAGE_DATA_PREFIX)
+    ? "[图片]"
+    : replyMsg.content.length > 60
+    ? replyMsg.content.slice(0, 60) + "…"
+    : replyMsg.content;
+  return (
+    <div className="mb-1.5 flex items-start gap-1.5 rounded-lg border-l-2 border-[var(--brand)] bg-[var(--ink)]/5 px-2 py-1">
+      <span className="shrink-0 text-[10px] font-bold text-[var(--ink)]/50">
+        {replyMsg.senderType === "user_self" ? "你" : "对方"}
+      </span>
+      <span className="min-w-0 truncate text-[11px] font-semibold text-[var(--ink)]/60">{preview}</span>
+    </div>
+  );
+}
+
+/** Round the bubble corners based on position in group. */
+function bubbleRadiusClass(position: BubblePosition, isSelf: boolean): string {
+  switch (position) {
+    case "single":
+      return "rounded-2xl " + (isSelf ? "rounded-br-sm" : "rounded-bl-sm");
+    case "first":
+      return isSelf
+        ? "rounded-2xl rounded-br-md"
+        : "rounded-2xl rounded-bl-md";
+    case "middle":
+      return isSelf
+        ? "rounded-2xl rounded-br-md rounded-tr-md"
+        : "rounded-2xl rounded-bl-md rounded-tl-md";
+    case "last":
+      return isSelf
+        ? "rounded-2xl rounded-br-sm"
+        : "rounded-2xl rounded-bl-sm";
+    default:
+      return "rounded-2xl";
+  }
 }
 
 export function ChatBubble({
@@ -116,6 +231,10 @@ export function ChatBubble({
   reactions,
   currentUserId,
   onReact,
+  onReply,
+  onDelete,
+  position = "single",
+  replyToMsg,
 }: {
   msg: BubbleMsg;
   targetName: string;
@@ -123,33 +242,79 @@ export function ChatBubble({
   reactions?: ReactionMap;
   currentUserId?: string;
   onReact?: (messageId: string, emoji: string) => void;
+  onReply?: (msg: BubbleMsg) => void;
+  onDelete?: (messageId: string) => void;
+  position?: BubblePosition;
+  replyToMsg?: BubbleMsg;
 }) {
   const isSelf = msg.senderType === "user_self";
   const [showPicker, setShowPicker] = useState(false);
   const [hovering, setHovering] = useState(false);
+  const [contextMenu, setContextMenu] = useState(false);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  const showAvatar = position === "single" || position === "first";
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu(true);
+  }, []);
+
+  const handlePointerDown = useCallback(() => {
+    longPressTimer.current = setTimeout(() => {
+      setContextMenu(true);
+    }, 500);
+  }, []);
+
+  const handlePointerUp = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
+
+  const handleCopy = useCallback(() => {
+    if (msg.content && !msg.content.startsWith(IMAGE_DATA_PREFIX)) {
+      navigator.clipboard.writeText(msg.content).catch(() => {});
+    }
+  }, [msg.content]);
 
   return (
     <div
+      ref={rowRef}
       className={`chat-bubble-row flex items-end gap-2 ${
         isSelf ? "flex-row-reverse" : "flex-row"
-      } ${msg.pending ? "opacity-70" : ""}`}
+      } ${msg.pending ? "opacity-70" : ""} ${!showAvatar ? (isSelf ? "pr-[46px]" : "pl-[46px]") : ""}`}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => {
         setHovering(false);
         setShowPicker(false);
       }}
+      onContextMenu={handleContextMenu}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      style={{ position: "relative" }}
     >
-      {isSelf ? <SelfAvatar /> : <Initials name={targetName} />}
+      {/* Avatar — only on first/single in group */}
+      {showAvatar &&
+        (isSelf ? <SelfAvatar /> : <Initials name={targetName} />)}
 
       <div className={`flex max-w-[74%] flex-col gap-1 ${isSelf ? "items-end" : "items-start"}`}>
         <div className="relative">
           <div
-            className={`chat-bubble relative rounded-2xl border-2 border-[var(--ink)] px-4 py-2.5 text-sm font-semibold leading-relaxed shadow-[4px_4px_0_var(--ink)] ${
+            className={`chat-bubble relative border-2 border-[var(--ink)] px-4 py-2.5 text-sm font-semibold leading-relaxed shadow-[4px_4px_0_var(--ink)] ${bubbleRadiusClass(
+              position,
               isSelf
-                ? "chat-bubble-self rounded-br-sm bg-[var(--c-gold)] text-[var(--ink)]"
-                : "chat-bubble-other rounded-bl-sm bg-[var(--paper)] text-[var(--ink)]"
+            )} ${
+              isSelf
+                ? "chat-bubble-self bg-[var(--c-gold)] text-[var(--ink)]"
+                : "chat-bubble-other bg-[var(--paper)] text-[var(--ink)]"
             }`}
           >
+            {/* Reply preview inside bubble */}
+            {replyToMsg && <ReplyPreview replyMsg={replyToMsg} />}
             {renderContent(msg.content)}
           </div>
 
@@ -172,6 +337,18 @@ export function ChatBubble({
               onClose={() => setShowPicker(false)}
             />
           )}
+
+          {/* Context menu (long-press / right-click) */}
+          {contextMenu && (
+            <MessageContextMenu
+              isSelf={isSelf}
+              onReply={() => onReply?.(msg)}
+              onCopy={handleCopy}
+              onReact={() => setShowPicker(true)}
+              onDelete={isSelf ? () => onDelete?.(msg.id) : undefined}
+              onClose={() => setContextMenu(false)}
+            />
+          )}
         </div>
 
         {/* Reaction badges */}
@@ -183,13 +360,16 @@ export function ChatBubble({
           />
         )}
 
-        <div className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--ink)]/40">
-          {msg.failed && <span className="text-[var(--love)]">发送失败</span>}
-          {msg.pending && !msg.failed && <span>发送中...</span>}
-          {isSelf && !msg.pending && !msg.failed && showReadStatus && (
-            <span>{msg.readByOther ? "已读" : "未读"}</span>
-          )}
-        </div>
+        {/* Status line — only show for last in group or pending */}
+        {(showReadStatus || position === "single" || position === "last") && (
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--ink)]/40">
+            {msg.failed && <span className="text-[var(--love)]">发送失败</span>}
+            {msg.pending && !msg.failed && <span>发送中...</span>}
+            {isSelf && !msg.pending && !msg.failed && showReadStatus && (
+              <span>{msg.readByOther ? "已读" : "未读"}</span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

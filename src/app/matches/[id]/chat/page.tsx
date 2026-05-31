@@ -17,6 +17,7 @@ import {
   ChatBubble,
   ChatTimeDivider,
   type BubbleMsg,
+  type BubblePosition,
 } from "@/components/ChatBubble";
 import { IMAGE_DATA_PREFIX } from "@/lib/utils";
 import {
@@ -27,45 +28,117 @@ import {
 
 const PAGE_SIZE = 40;
 
-const EMOJI_ROWS = [
-  ["😊", "😂", "🥰", "😍", "🤭", "😎", "🤝", "🥺", "😮", "🫶"],
-  ["❤️", "💗", "💛", "💚", "💙", "💜", "✨", "🔥", "🌙", "☀️"],
-  ["👍", "👏", "🙌", "🙏", "💪", "✌️", "👋", "👌", "🎉", "🍀"],
-  ["🍜", "☕", "🎬", "🎧", "📚", "✈️", "🏖️", "🚲", "🌃", "🎮"],
+/* ──────────────────── Expanded Emoji Picker Data ──────────────────── */
+type EmojiCategory = { label: string; icon: string; emojis: string[] };
+
+const EMOJI_CATEGORIES: EmojiCategory[] = [
+  {
+    label: "表情",
+    icon: "😀",
+    emojis: [
+      "😀","😃","😄","😁","😆","😅","🤣","😂","🙂","🙃",
+      "😉","😊","😇","🥰","😍","🤩","😘","😗","😚","😙",
+      "🥲","😋","😛","😜","🤪","😝","🤑","🤗","🤭","🫢",
+    ],
+  },
+  {
+    label: "爱心",
+    icon: "❤️",
+    emojis: [
+      "❤️","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💗",
+      "💖","💝","💘","💕","💞","💓","💟","❣️","💔","❤️‍🔥",
+      "🫶","😍","🥰","😘","💋","😻","💑","👩‍❤️‍👨","🩷","🩵",
+    ],
+  },
+  {
+    label: "手势",
+    icon: "👍",
+    emojis: [
+      "👍","👎","👏","🙌","🤝","🙏","💪","✌️","🤞","🫰",
+      "🤟","🤘","👌","🤌","🤏","👈","👉","👆","👇","☝️",
+      "✋","🤚","🖐️","🖖","👋","🤙","🫱","🫲","🫳","🫴",
+    ],
+  },
+  {
+    label: "美食",
+    icon: "🍕",
+    emojis: [
+      "🍕","🍔","🍟","🌭","🍿","🧂","🥚","🍳","🧈","🥞",
+      "🧇","🥓","🥩","🍗","🍖","🦴","🌮","🌯","🫔","🥙",
+      "🧆","🥗","🍜","🍝","🍣","🍱","🍰","🎂","🍩","☕",
+    ],
+  },
+  {
+    label: "活动",
+    icon: "🎯",
+    emojis: [
+      "⚽","🏀","🏈","⚾","🎾","🏐","🏉","🎱","🏓","🏸",
+      "🎯","🎮","🕹️","🎲","🧩","🎭","🎨","🎬","🎤","🎧",
+      "🎸","🎹","🥁","🎺","🎻","🎪","🏆","🥇","🥈","🥉",
+    ],
+  },
+  {
+    label: "地点",
+    icon: "🏠",
+    emojis: [
+      "🏠","🏡","🏢","🏣","🏤","🏥","🏦","🏨","🏩","🏪",
+      "🏫","🏬","🏭","🏯","🏰","⛪","🕌","🕍","⛩️","🗼",
+      "🗽","⛲","🌁","🌃","🌆","🌇","🌉","🌌","⛺","🏕️",
+    ],
+  },
+  {
+    label: "符号",
+    icon: "✨",
+    emojis: [
+      "✨","⭐","🌟","💫","🔥","💥","🎉","🎊","✅","❌",
+      "⭕","🔴","🟠","🟡","🟢","🔵","🟣","⚫","⚪","🟤",
+      "💯","💢","💤","💨","🕳️","💬","👁️‍🗨️","🗯️","💭","🔔",
+    ],
+  },
 ];
 
-// Quick reply templates
-const QUICK_REPLIES = [
-  "哈哈 真的吗？",
-  "听起来不错！",
-  "我也这么觉得 😊",
-  "然后呢？",
-  "太有意思了！",
-  "下次一起试试？",
-  "你是怎么想的？",
-  "我也是！",
-  "好巧 我也是",
-  "确实 这很重要",
-];
+/* ──────────────────── Quick Reply Engine (contextual) ──────────────────── */
+const QR_QUESTION = ["我在想...", "说实话...", "你觉得呢？", "让我想想 🤔", "好问题！"];
+const QR_EXPERIENCE = ["我也试过！", "听起来很棒", "下次带我", "太厉害了 👏", "我也有类似经历"];
+const QR_EMOTIONAL = ["我能理解", "抱抱 🤗", "你真的很棒", "辛苦了", "我在这里"];
+const QR_ICEBREAKER = ["你好呀 👋", "最近怎么样？", "发现你也喜欢...", "这个周末有什么安排？", "分享一个有趣的事"];
+const QR_DEEPER = ["你觉得什么最重要？", "你对未来有什么期待？", "有什么想一起做的？", "你最开心的事是什么？", "如果可以重来..."];
+const QR_GENERAL = ["哈哈 真的吗？", "听起来不错！", "我也这么觉得 😊", "然后呢？", "太有意思了！", "下次一起试试？", "我也是！", "好巧 我也是", "确实 这很重要"];
 
-function generateQuickReplies(lastMessage: string): string[] {
-  // Simple: pick 3 random quick replies, optionally contextual
-  const shuffled = [...QUICK_REPLIES].sort(() => Math.random() - 0.5);
-  const picks = shuffled.slice(0, 3);
+function generateQuickReplies(lastMessage: string, totalMessages: number): string[] {
+  let pool: string[];
 
-  // Contextual boost: if message contains question mark, add a question reply
-  if (lastMessage.includes("？") || lastMessage.includes("?")) {
-    if (!picks.includes("你是怎么想的？")) {
-      picks[2] = "你是怎么想的？";
-    }
+  if (totalMessages < 4) {
+    // Short conversation — ice breakers
+    pool = QR_ICEBREAKER;
+  } else if (lastMessage.includes("？") || lastMessage.includes("?")) {
+    // Question detected
+    pool = QR_QUESTION;
+  } else if (
+    lastMessage.includes("！") || lastMessage.includes("!") ||
+    lastMessage.includes("试过") || lastMessage.includes("去过") ||
+    lastMessage.includes("玩过") || lastMessage.includes("看过") ||
+    lastMessage.includes("吃过") || lastMessage.includes("去过")
+  ) {
+    pool = QR_EXPERIENCE;
+  } else if (
+    lastMessage.includes("难过") || lastMessage.includes("开心") ||
+    lastMessage.includes("伤心") || lastMessage.includes("生气") ||
+    lastMessage.includes("焦虑") || lastMessage.includes("压力") ||
+    lastMessage.includes("开心") || lastMessage.includes("幸福") ||
+    lastMessage.includes("感动") || lastMessage.includes("累") ||
+    lastMessage.includes("心") || lastMessage.includes("想哭")
+  ) {
+    pool = QR_EMOTIONAL;
+  } else if (totalMessages > 30) {
+    // Long conversation — deeper questions
+    pool = QR_DEEPER;
+  } else {
+    pool = QR_GENERAL;
   }
-  if (lastMessage.includes("！") || lastMessage.includes("!")) {
-    if (!picks.includes("太有意思了！")) {
-      picks[0] = "太有意思了！";
-    }
-  }
 
-  return picks.slice(0, 3);
+  const shuffled = [...pool].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, 3);
 }
 
 type GuidanceData = {
@@ -112,6 +185,21 @@ function sortedMessages(messages: BubbleMsg[]) {
   );
 }
 
+/** Determine bubble position within a consecutive group from the same sender. */
+function getBubblePosition(messages: BubbleMsg[], index: number): BubblePosition {
+  const cur = messages[index];
+  const prev = index > 0 ? messages[index - 1] : undefined;
+  const next = index < messages.length - 1 ? messages[index + 1] : undefined;
+
+  const prevSame = prev && prev.senderType === cur.senderType && !needsDivider(prev, cur);
+  const nextSame = next && next.senderType === cur.senderType && !needsDivider(cur, next);
+
+  if (prevSame && nextSame) return "middle";
+  if (prevSame && !nextSame) return "last";
+  if (!prevSame && nextSame) return "first";
+  return "single";
+}
+
 export default function HumanChatPage() {
   const params = useParams();
   const id = params.id as string;
@@ -123,6 +211,7 @@ export default function HumanChatPage() {
   const [sending, setSending] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
+  const [emojiCategory, setEmojiCategory] = useState(0);
   const [selectedImageDataUrl, setSelectedImageDataUrl] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -131,11 +220,27 @@ export default function HumanChatPage() {
   const [showGuide, setShowGuide] = useState(false);
   const [, startTransition] = useTransition();
 
-  // New state for reactions, typing, quick replies
+  // Reactions, typing, quick replies
   const [reactionsState, setReactionsState] = useState<Record<string, ReactionMap>>({});
   const [otherTyping, setOtherTyping] = useState(false);
   const [quickReplies, setQuickReplies] = useState<string[]>([]);
   const [showQuickReplies, setShowQuickReplies] = useState(true);
+
+  // #2: Scroll-to-bottom button
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // #3: New messages indicator
+  const [newMsgBar, setNewMsgBar] = useState(0); // number of new messages while scrolled up
+
+  // #4: Reply/quote
+  const [replyTo, setReplyTo] = useState<BubbleMsg | null>(null);
+
+  // #8: Online status (static green dot for now)
+  const [isOnline] = useState(true);
+
+  // #9: Conversation duration
+  const [matchCreatedAt, setMatchCreatedAt] = useState<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -144,6 +249,7 @@ export default function HumanChatPage() {
   const pendingIdRef = useRef(0);
   const lastCreatedAtRef = useRef<string | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isAtBottomRef = useRef(true);
 
   const rememberLast = useCallback((items: BubbleMsg[]) => {
     if (items.length) lastCreatedAtRef.current = items[items.length - 1].createdAt;
@@ -151,6 +257,23 @@ export default function HumanChatPage() {
 
   const scrollToBottom = useCallback((smooth = true) => {
     bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
+    setNewMsgBar(0);
+    setUnreadCount(0);
+    isAtBottomRef.current = true;
+  }, []);
+
+  // #2: Scroll position tracking
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const atBottom = distFromBottom < 120;
+    isAtBottomRef.current = atBottom;
+    setShowScrollBtn(distFromBottom > 300);
+    if (atBottom) {
+      setNewMsgBar(0);
+      setUnreadCount(0);
+    }
   }, []);
 
   const mergeMessages = useCallback(
@@ -201,6 +324,12 @@ export default function HumanChatPage() {
       setTargetName(detailRes.data.targetUser.name ?? "对方");
       setTargetUserId(detailRes.data.targetUser.id ?? null);
     }
+    // #9: Store match creation date
+    if (detailRes?.code === 0 && detailRes?.data?.createdAt) {
+      setMatchCreatedAt(detailRes.data.createdAt);
+    } else if (detailRes?.code === 0 && detailRes?.data?.match?.createdAt) {
+      setMatchCreatedAt(detailRes.data.match.createdAt);
+    }
 
     if (chatRes?.code === 0 && Array.isArray(chatRes.data)) {
       const next = sortedMessages(chatRes.data);
@@ -212,7 +341,7 @@ export default function HumanChatPage() {
       // Generate quick replies from last received message
       const lastReceived = [...next].reverse().find((m) => m.senderType === "user_target");
       if (lastReceived) {
-        setQuickReplies(generateQuickReplies(lastReceived.content));
+        setQuickReplies(generateQuickReplies(lastReceived.content, next.length));
       }
     }
 
@@ -269,7 +398,17 @@ export default function HumanChatPage() {
         const incoming: BubbleMsg[] = JSON.parse(event.data);
         if (!incoming.length) return;
         startTransition(() => mergeMessages(incoming));
-        setTimeout(() => scrollToBottom(), 80);
+
+        // #3: If scrolled up, show new message indicator; else auto-scroll
+        if (!isAtBottomRef.current) {
+          const targetMsgs = incoming.filter((m) => m.senderType === "user_target");
+          if (targetMsgs.length > 0) {
+            setNewMsgBar((prev) => prev + targetMsgs.length);
+            setUnreadCount((prev) => prev + targetMsgs.length);
+          }
+        } else {
+          setTimeout(() => scrollToBottom(), 80);
+        }
 
         fetch(`/api/matches/${id}/chat/read`, {
           method: "POST",
@@ -281,7 +420,10 @@ export default function HumanChatPage() {
           .filter((m) => m.senderType === "user_target")
           .pop();
         if (lastReceived) {
-          setQuickReplies(generateQuickReplies(lastReceived.content));
+          setMessages((prev) => {
+            setQuickReplies(generateQuickReplies(lastReceived.content, prev.length));
+            return prev;
+          });
           setShowQuickReplies(true);
         }
       });
@@ -349,6 +491,18 @@ export default function HumanChatPage() {
     }
   }, [hasMore, id, loadingMore, messages, rememberLast]);
 
+  // #4: Delete message handler
+  const handleDelete = useCallback((messageId: string) => {
+    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    // Try server delete (fire and forget)
+    if (id) {
+      fetch(`/api/matches/${id}/chat/${messageId}`, {
+        method: "DELETE",
+        credentials: "include",
+      }).catch(() => {});
+    }
+  }, [id]);
+
   const send = useCallback(async () => {
     if (sending || !id) return;
     const text = input.trim();
@@ -374,12 +528,14 @@ export default function HumanChatPage() {
       createdAt: now,
       readByOther: false,
       pending: true,
+      replyToId: replyTo?.id,
     }));
     setMessages((prev) => {
       const next = [...prev, ...optimistic];
       rememberLast(next);
       return next;
     });
+    setReplyTo(null); // clear reply after sending
     setTimeout(() => scrollToBottom(), 60);
 
     try {
@@ -388,13 +544,13 @@ export default function HumanChatPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ content }),
+          body: JSON.stringify({ content, replyToId: replyTo?.id }),
         }).then((r) => r.json().catch(() => null));
 
         if (res?.code === 0 && res?.data?.id) {
           setMessages((prev) =>
             prev.map((m) =>
-              m.id === pendingId ? { ...res.data, senderType: "user_self" as const, pending: false } : m
+              m.id === pendingId ? { ...res.data, senderType: "user_self" as const, pending: false, replyToId: replyTo?.id } : m
             )
           );
         } else {
@@ -407,7 +563,7 @@ export default function HumanChatPage() {
       setSending(false);
       void refreshGuidance();
     }
-  }, [id, input, refreshGuidance, rememberLast, scrollToBottom, selectedImageDataUrl, sending]);
+  }, [id, input, refreshGuidance, rememberLast, replyTo, scrollToBottom, selectedImageDataUrl, sending]);
 
   const applySuggestion = useCallback((text: string) => {
     setInput((value) => (value.trim() ? `${value.trim()}\n${text}` : text));
@@ -446,6 +602,12 @@ export default function HumanChatPage() {
     [id]
   );
 
+  // #4: Reply handler
+  const handleReply = useCallback((msg: BubbleMsg) => {
+    setReplyTo(msg);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }, []);
+
   const onInputChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
     setInput(event.target.value);
     notifyTyping();
@@ -479,12 +641,36 @@ export default function HumanChatPage() {
   const canSend = Boolean(input.trim() || selectedImageDataUrl);
   const guideExpanded = messages.length === 0 || showGuide;
 
+  // #9: Calculate days since match
+  const daysSinceMatch = matchCreatedAt
+    ? Math.max(1, Math.floor((Date.now() - new Date(matchCreatedAt).getTime()) / 86400000) + 1)
+    : null;
+
+  // Build a map of reply-to messages for quick lookup
+  const msgMap = useRef<Map<string, BubbleMsg>>(new Map());
+  useEffect(() => {
+    const map = new Map<string, BubbleMsg>();
+    for (const m of messages) map.set(m.id, m);
+    msgMap.current = map;
+  }, [messages]);
+
   return (
     <main className="chat-shell flex h-dvh flex-col overflow-hidden bg-[var(--paper-2)]">
       <div className="chat-header shrink-0 border-b-2 border-[var(--ink)] bg-[var(--paper)]">
         <AppHeader
           backHref={`/matches/${id}`}
-          title={targetName}
+          title={
+            <span className="flex items-center gap-2">
+              {targetName}
+              {/* #8: Online status indicator */}
+              <span
+                className={`inline-block h-2.5 w-2.5 rounded-full border border-[var(--ink)] ${
+                  isOnline ? "bg-green-500" : "bg-gray-400"
+                }`}
+                title={isOnline ? "在线" : "离线"}
+              />
+            </span>
+          }
           right={
             <div className="flex items-center gap-2">
               {targetUserId && (
@@ -508,6 +694,7 @@ export default function HumanChatPage() {
         ref={scrollRef}
         className="chat-messages flex-1 overflow-y-auto px-4 py-3"
         style={{ overscrollBehavior: "contain" }}
+        onScroll={handleScroll}
       >
         {hasMore && (
           <div className="mb-3 flex justify-center">
@@ -610,20 +797,36 @@ export default function HumanChatPage() {
             </div>
           </div>
         ) : (
-          <div className="space-y-1.5">
-            {messages.map((msg, i) => (
-              <div key={msg.id}>
-                {needsDivider(messages[i - 1], msg) && <ChatTimeDivider label={fmtTime(msg.createdAt)} />}
-                <ChatBubble
-                  msg={msg}
-                  targetName={targetName}
-                  showReadStatus={i === messages.length - 1 || msg.pending}
-                  reactions={reactionsState[msg.id]}
-                  currentUserId="self"
-                  onReact={handleReaction}
-                />
-              </div>
-            ))}
+          <div className="space-y-1">
+            {messages.map((msg, i) => {
+              const isFirst = i === 0;
+              const showDiv = needsDivider(messages[i - 1], msg);
+              const position = getBubblePosition(messages, i);
+              const replyToMsg = msg.replyToId ? msgMap.current.get(msg.replyToId) : undefined;
+
+              return (
+                <div key={msg.id}>
+                  {showDiv && (
+                    <ChatTimeDivider
+                      label={fmtTime(msg.createdAt)}
+                      subLabel={isFirst && daysSinceMatch ? `相识第 ${daysSinceMatch} 天` : undefined}
+                    />
+                  )}
+                  <ChatBubble
+                    msg={msg}
+                    targetName={targetName}
+                    showReadStatus={i === messages.length - 1 || msg.pending}
+                    reactions={reactionsState[msg.id]}
+                    currentUserId="self"
+                    onReact={handleReaction}
+                    onReply={handleReply}
+                    onDelete={handleDelete}
+                    position={position}
+                    replyToMsg={replyToMsg}
+                  />
+                </div>
+              );
+            })}
 
             {/* Typing indicator */}
             {otherTyping && (
@@ -649,6 +852,44 @@ export default function HumanChatPage() {
         <div ref={bottomRef} className="h-1" />
       </div>
 
+      {/* #2: Scroll-to-bottom floating button */}
+      {showScrollBtn && (
+        <div className="pointer-events-none absolute bottom-[140px] right-4 z-30 flex items-center justify-center">
+          <button
+            type="button"
+            onClick={() => scrollToBottom(true)}
+            className="pointer-events-auto relative flex h-10 w-10 items-center justify-center rounded-full border-2 border-[var(--ink)] bg-[var(--brand)] text-[var(--ink)] shadow-[3px_3px_0_var(--ink)] transition hover:-translate-y-0.5"
+            aria-label="回到底部"
+          >
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 16l-6-6h12l-6 6z" />
+            </svg>
+            {/* Unread badge */}
+            {unreadCount > 0 && (
+              <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full border-2 border-[var(--ink)] bg-[var(--love)] px-1 text-[10px] font-black text-white shadow-[2px_2px_0_var(--ink)]">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* #3: New messages indicator bar */}
+      {newMsgBar > 0 && (
+        <div className="absolute bottom-[140px] left-1/2 z-30 -translate-x-1/2">
+          <button
+            type="button"
+            onClick={() => scrollToBottom(true)}
+            className="flex items-center gap-1.5 rounded-full border-2 border-[var(--ink)] bg-[var(--brand)] px-4 py-2 text-xs font-black text-[var(--ink)] shadow-[3px_3px_0_var(--ink)] transition hover:-translate-y-0.5"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 16l-6-6h12l-6 6z" />
+            </svg>
+            {newMsgBar} 条新消息
+          </button>
+        </div>
+      )}
+
       <div className="chat-input-bar shrink-0 border-t-2 border-[var(--ink)] bg-[var(--paper)]">
         {/* Quick reply suggestions */}
         {quickReplies.length > 0 && showQuickReplies && messages.length > 0 && (
@@ -670,6 +911,29 @@ export default function HumanChatPage() {
           </div>
         )}
 
+        {/* #4: Reply preview above input */}
+        {replyTo && (
+          <div className="flex items-center gap-2 border-b-2 border-[var(--ink)] bg-[var(--paper-2)] px-3 py-2">
+            <span className="text-sm">↩️</span>
+            <div className="min-w-0 flex-1">
+              <span className="text-[11px] font-black text-[var(--ink)]/50">
+                回复 {replyTo.senderType === "user_self" ? "自己" : targetName}
+              </span>
+              <p className="truncate text-xs font-bold text-[var(--ink)]/70">
+                {replyTo.content.startsWith(IMAGE_DATA_PREFIX) ? "[图片]" : replyTo.content}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setReplyTo(null)}
+              className="shrink-0 text-sm text-[var(--ink)]/40 hover:text-[var(--ink)]"
+              aria-label="取消回复"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {selectedImageDataUrl && (
           <div className="flex items-center gap-3 border-b-2 border-[var(--ink)] px-4 py-2">
             <img
@@ -688,22 +952,38 @@ export default function HumanChatPage() {
           </div>
         )}
 
+        {/* #5: Expanded emoji picker with categories */}
         {showEmoji && (
           <div className="border-b-2 border-[var(--ink)] bg-[var(--c-gold)] px-4 py-3">
-            <div className="space-y-2">
-              {EMOJI_ROWS.map((row, rowIndex) => (
-                <div key={rowIndex} className="flex flex-wrap gap-2">
-                  {row.map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      onClick={() => setInput((value) => value + emoji)}
-                      className="flex h-9 w-9 items-center justify-center rounded-xl border-2 border-[var(--ink)] bg-[var(--paper)] text-lg shadow-[2px_2px_0_var(--ink)] transition hover:-translate-y-0.5"
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
+            {/* Category tabs */}
+            <div className="mb-2 flex gap-1 overflow-x-auto pb-1">
+              {EMOJI_CATEGORIES.map((cat, idx) => (
+                <button
+                  key={cat.label}
+                  type="button"
+                  onClick={() => setEmojiCategory(idx)}
+                  className={`flex items-center gap-1 whitespace-nowrap rounded-full border-2 border-[var(--ink)] px-2.5 py-1 text-[11px] font-black shadow-[2px_2px_0_var(--ink)] transition ${
+                    emojiCategory === idx
+                      ? "bg-[var(--brand)] text-[var(--ink)]"
+                      : "bg-[var(--paper)] text-[var(--ink)]/60 hover:bg-[var(--paper-2)]"
+                  }`}
+                >
+                  <span>{cat.icon}</span>
+                  <span>{cat.label}</span>
+                </button>
+              ))}
+            </div>
+            {/* Emoji grid for selected category */}
+            <div className="grid grid-cols-8 gap-1.5 sm:grid-cols-10">
+              {EMOJI_CATEGORIES[emojiCategory].emojis.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => setInput((value) => value + emoji)}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl border-2 border-[var(--ink)] bg-[var(--paper)] text-lg shadow-[2px_2px_0_var(--ink)] transition hover:-translate-y-0.5"
+                >
+                  {emoji}
+                </button>
               ))}
             </div>
           </div>
