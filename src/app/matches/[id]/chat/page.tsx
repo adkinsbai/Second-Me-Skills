@@ -19,6 +19,12 @@ import {
   type BubbleMsg,
 } from "@/components/ChatBubble";
 import { IMAGE_DATA_PREFIX } from "@/lib/utils";
+import {
+  loadReactions,
+  saveReactions,
+  toggleReaction,
+  type ReactionMap,
+} from "@/components/MessageReactions";
 
 const PAGE_SIZE = 40;
 
@@ -28,6 +34,40 @@ const EMOJI_ROWS = [
   ["👍", "👏", "🙌", "🙏", "💪", "✌️", "👋", "👌", "🎉", "🍀"],
   ["🍜", "☕", "🎬", "🎧", "📚", "✈️", "🏖️", "🚲", "🌃", "🎮"],
 ];
+
+// Quick reply templates
+const QUICK_REPLIES = [
+  "哈哈 真的吗？",
+  "听起来不错！",
+  "我也这么觉得 😊",
+  "然后呢？",
+  "太有意思了！",
+  "下次一起试试？",
+  "你是怎么想的？",
+  "我也是！",
+  "好巧 我也是",
+  "确实 这很重要",
+];
+
+function generateQuickReplies(lastMessage: string): string[] {
+  // Simple: pick 3 random quick replies, optionally contextual
+  const shuffled = [...QUICK_REPLIES].sort(() => Math.random() - 0.5);
+  const picks = shuffled.slice(0, 3);
+
+  // Contextual boost: if message contains question mark, add a question reply
+  if (lastMessage.includes("？") || lastMessage.includes("?")) {
+    if (!picks.includes("你是怎么想的？")) {
+      picks[2] = "你是怎么想的？";
+    }
+  }
+  if (lastMessage.includes("！") || lastMessage.includes("!")) {
+    if (!picks.includes("太有意思了！")) {
+      picks[0] = "太有意思了！";
+    }
+  }
+
+  return picks.slice(0, 3);
+}
 
 type GuidanceData = {
   openerSuggestions: string[];
@@ -92,12 +132,19 @@ export default function HumanChatPage() {
   const [showGuide, setShowGuide] = useState(false);
   const [, startTransition] = useTransition();
 
+  // New state for reactions, typing, quick replies
+  const [reactionsState, setReactionsState] = useState<Record<string, ReactionMap>>({});
+  const [otherTyping, setOtherTyping] = useState(false);
+  const [quickReplies, setQuickReplies] = useState<string[]>([]);
+  const [showQuickReplies, setShowQuickReplies] = useState(true);
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sseRef = useRef<EventSource | null>(null);
   const pendingIdRef = useRef(0);
   const lastCreatedAtRef = useRef<string | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const rememberLast = useCallback((items: BubbleMsg[]) => {
     if (items.length) lastCreatedAtRef.current = items[items.length - 1].createdAt;
@@ -128,6 +175,13 @@ export default function HumanChatPage() {
     if (result?.code === 0) setGuidance(result.data);
   }, [id]);
 
+  // Load reactions from localStorage
+  useEffect(() => {
+    if (id) {
+      setReactionsState(loadReactions(id));
+    }
+  }, [id]);
+
   const initialLoad = useCallback(async () => {
     if (!id) return;
 
@@ -155,6 +209,12 @@ export default function HumanChatPage() {
       setMessages(next);
       setHasMore(next.length >= PAGE_SIZE);
       setTimeout(() => scrollToBottom(false), 60);
+
+      // Generate quick replies from last received message
+      const lastReceived = [...next].reverse().find((m) => m.senderType === "user_target");
+      if (lastReceived) {
+        setQuickReplies(generateQuickReplies(lastReceived.content));
+      }
     }
 
     if (guidanceRes?.code === 0) setGuidance(guidanceRes.data);
@@ -164,6 +224,37 @@ export default function HumanChatPage() {
   useEffect(() => {
     initialLoad();
   }, [initialLoad]);
+
+  // Typing indicator polling
+  useEffect(() => {
+    if (!id) return;
+    const interval = setInterval(() => {
+      fetch(`/api/matches/${id}/typing`, { credentials: "include" })
+        .then((r) => r.json())
+        .then((result) => {
+          if (result?.code === 0) {
+            setOtherTyping(result.data?.typing ?? false);
+          }
+        })
+        .catch(() => {});
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [id]);
+
+  // Send typing status when user types
+  const notifyTyping = useCallback(() => {
+    if (!id) return;
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    fetch(`/api/matches/${id}/typing`, {
+      method: "POST",
+      credentials: "include",
+    }).catch(() => {});
+    // Auto-clear typing after 5s of inactivity
+    typingTimeoutRef.current = setTimeout(() => {
+      setOtherTyping(false);
+    }, 5000);
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -185,6 +276,15 @@ export default function HumanChatPage() {
           method: "POST",
           credentials: "include",
         }).catch(() => {});
+
+        // Generate quick replies from new incoming messages
+        const lastReceived = incoming
+          .filter((m) => m.senderType === "user_target")
+          .pop();
+        if (lastReceived) {
+          setQuickReplies(generateQuickReplies(lastReceived.content));
+          setShowQuickReplies(true);
+        }
       });
 
       es.addEventListener("read_update", () => {
@@ -260,6 +360,7 @@ export default function HumanChatPage() {
     setInput("");
     setSelectedImageDataUrl(null);
     setShowEmoji(false);
+    setShowQuickReplies(false);
     if (textareaRef.current) textareaRef.current.style.height = "40px";
 
     const toSend: Array<{ content: string; pendingId: string }> = [];
@@ -269,7 +370,7 @@ export default function HumanChatPage() {
     const now = new Date().toISOString();
     const optimistic: BubbleMsg[] = toSend.map(({ content, pendingId }) => ({
       id: pendingId,
-      senderType: "user_self",
+      senderType: "user_self" as const,
       content,
       createdAt: now,
       readByOther: false,
@@ -322,8 +423,21 @@ export default function HumanChatPage() {
     });
   }, []);
 
+  const handleReaction = useCallback(
+    (messageId: string, emoji: string) => {
+      if (!id) return;
+      setReactionsState((prev) => {
+        const next = toggleReaction(prev, messageId, emoji, "self");
+        saveReactions(id, next);
+        return next;
+      });
+    },
+    [id]
+  );
+
   const onInputChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
     setInput(event.target.value);
+    notifyTyping();
     const el = event.target;
     el.style.height = "40px";
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
@@ -355,8 +469,8 @@ export default function HumanChatPage() {
   const guideExpanded = messages.length === 0 || showGuide;
 
   return (
-    <main className="chat-shell flex h-dvh flex-col overflow-hidden bg-[#F7F2E8]">
-      <div className="chat-header shrink-0 border-b-2 border-[var(--ink)] bg-[#FFFDF2]">
+    <main className="chat-shell flex h-dvh flex-col overflow-hidden bg-[var(--paper-2)]">
+      <div className="chat-header shrink-0 border-b-2 border-[var(--ink)] bg-[var(--paper)]">
         <AppHeader
           backHref={`/matches/${id}`}
           title={targetName}
@@ -398,7 +512,7 @@ export default function HumanChatPage() {
         )}
 
         {(guidance || guidanceLoading) && (
-          <section className="mb-4 rounded-[1.25rem] border-2 border-[var(--ink)] bg-[#FFE500] p-3 shadow-[5px_5px_0_var(--ink)]">
+          <section className="mb-4 rounded-[1.25rem] border-2 border-[var(--ink)] bg-[var(--c-gold)] p-3 shadow-[5px_5px_0_var(--ink)]">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[var(--ink)]">
@@ -436,7 +550,7 @@ export default function HumanChatPage() {
                           key={item}
                           type="button"
                           onClick={() => applySuggestion(item)}
-                          className="min-h-[58px] rounded-xl border-2 border-[var(--ink)] bg-[#FFFDF2] px-3 py-2 text-left text-xs font-bold leading-5 text-[var(--ink)] shadow-[3px_3px_0_var(--ink)] transition hover:-translate-y-0.5 hover:bg-[#C7FF00]"
+                          className="min-h-[58px] rounded-xl border-2 border-[var(--ink)] bg-[var(--paper)] px-3 py-2 text-left text-xs font-bold leading-5 text-[var(--ink)] shadow-[3px_3px_0_var(--ink)] transition hover:-translate-y-0.5 hover:bg-[var(--brand)]"
                         >
                           {item}
                         </button>
@@ -452,7 +566,7 @@ export default function HumanChatPage() {
                       {guidance.nextActions.slice(0, 3).map((item) => (
                         <span
                           key={item}
-                          className="whitespace-nowrap rounded-full border-2 border-[var(--ink)] bg-[#C7FF00] px-3 py-1 text-xs font-black text-[var(--ink)] shadow-[2px_2px_0_var(--ink)]"
+                          className="whitespace-nowrap rounded-full border-2 border-[var(--ink)] bg-[var(--brand)] px-3 py-1 text-xs font-black text-[var(--ink)] shadow-[2px_2px_0_var(--ink)]"
                         >
                           {item}
                         </span>
@@ -462,7 +576,7 @@ export default function HumanChatPage() {
                 )}
 
                 {!!guidance.reflectionPrompts?.length && (
-                  <p className="rounded-xl border-2 border-[var(--ink)] bg-[#174BFF] px-3 py-2 text-xs font-bold leading-5 text-white shadow-[3px_3px_0_var(--ink)]">
+                  <p className="rounded-xl border-2 border-[var(--ink)] bg-[var(--c-blue)] px-3 py-2 text-xs font-bold leading-5 text-white shadow-[3px_3px_0_var(--ink)]">
                     {guidance.reflectionPrompts[0]}
                   </p>
                 )}
@@ -479,7 +593,7 @@ export default function HumanChatPage() {
           <div className="flex min-h-[42vh] items-center justify-center">
             <div className="glass-card max-w-sm p-5 text-center">
               <p className="text-sm font-black">还没有消息</p>
-              <p className="mt-2 text-sm leading-6 luxury-subtitle">
+              <p className="mt-2 text-sm leading-6 text-[var(--ink)]/60">
                 可以选择上方建议，也可以自己发一句具体、轻松的开场。
               </p>
             </div>
@@ -493,16 +607,58 @@ export default function HumanChatPage() {
                   msg={msg}
                   targetName={targetName}
                   showReadStatus={i === messages.length - 1 || msg.pending}
+                  reactions={reactionsState[msg.id]}
+                  currentUserId="self"
+                  onReact={handleReaction}
                 />
               </div>
             ))}
+
+            {/* Typing indicator */}
+            {otherTyping && (
+              <div className="flex items-end gap-2">
+                <div className="chat-avatar flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-2 border-[var(--ink)] bg-[var(--brand)] text-sm font-black text-[var(--ink)] shadow-[3px_3px_0_var(--ink)]">
+                  {(targetName?.[0] ?? "Q").toUpperCase()}
+                </div>
+                <div className="rounded-2xl rounded-bl-sm border-2 border-[var(--ink)] bg-[var(--paper)] px-4 py-3 shadow-[4px_4px_0_var(--ink)]">
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs font-bold text-[var(--ink)]/50">对方正在输入</span>
+                    <span className="flex gap-0.5">
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--ink)]/40" style={{ animationDelay: "0ms" }} />
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--ink)]/40" style={{ animationDelay: "150ms" }} />
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--ink)]/40" style={{ animationDelay: "300ms" }} />
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         <div ref={bottomRef} className="h-1" />
       </div>
 
-      <div className="chat-input-bar shrink-0 border-t-2 border-[var(--ink)] bg-[#FFFDF2]">
+      <div className="chat-input-bar shrink-0 border-t-2 border-[var(--ink)] bg-[var(--paper)]">
+        {/* Quick reply suggestions */}
+        {quickReplies.length > 0 && showQuickReplies && messages.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto border-b-2 border-[var(--ink)] bg-[var(--paper-2)] px-3 py-2">
+            {quickReplies.map((reply) => (
+              <button
+                key={reply}
+                type="button"
+                onClick={() => {
+                  setInput(reply);
+                  setShowQuickReplies(false);
+                  requestAnimationFrame(() => textareaRef.current?.focus());
+                }}
+                className="whitespace-nowrap rounded-full border-2 border-[var(--ink)] bg-[var(--paper)] px-3 py-1 text-xs font-bold text-[var(--ink)] shadow-[2px_2px_0_var(--ink)] transition hover:-translate-y-0.5 hover:bg-[var(--brand)]"
+              >
+                {reply}
+              </button>
+            ))}
+          </div>
+        )}
+
         {selectedImageDataUrl && (
           <div className="flex items-center gap-3 border-b-2 border-[var(--ink)] px-4 py-2">
             <img
@@ -510,7 +666,7 @@ export default function HumanChatPage() {
               alt="待发送图片"
               className="h-14 w-14 rounded-xl border-2 border-[var(--ink)] object-cover shadow-[3px_3px_0_var(--ink)]"
             />
-            <div className="flex-1 text-xs font-black luxury-subtitle">已选择图片</div>
+            <div className="flex-1 text-xs font-black text-[var(--ink)]/60">已选择图片</div>
             <button
               type="button"
               onClick={() => setSelectedImageDataUrl(null)}
@@ -522,7 +678,7 @@ export default function HumanChatPage() {
         )}
 
         {showEmoji && (
-          <div className="border-b-2 border-[var(--ink)] bg-[#FFE500] px-4 py-3">
+          <div className="border-b-2 border-[var(--ink)] bg-[var(--c-gold)] px-4 py-3">
             <div className="space-y-2">
               {EMOJI_ROWS.map((row, rowIndex) => (
                 <div key={rowIndex} className="flex flex-wrap gap-2">
@@ -531,7 +687,7 @@ export default function HumanChatPage() {
                       key={emoji}
                       type="button"
                       onClick={() => setInput((value) => value + emoji)}
-                      className="flex h-9 w-9 items-center justify-center rounded-xl border-2 border-[var(--ink)] bg-[#FFFDF2] text-lg shadow-[2px_2px_0_var(--ink)] transition hover:-translate-y-0.5"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border-2 border-[var(--ink)] bg-[var(--paper)] text-lg shadow-[2px_2px_0_var(--ink)] transition hover:-translate-y-0.5"
                     >
                       {emoji}
                     </button>
@@ -547,7 +703,7 @@ export default function HumanChatPage() {
             type="button"
             onClick={() => setShowEmoji((value) => !value)}
             className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 border-[var(--ink)] text-xl shadow-[3px_3px_0_var(--ink)] ${
-              showEmoji ? "bg-[#FFE500]" : "bg-[#FFFDF2]"
+              showEmoji ? "bg-[var(--c-gold)]" : "bg-[var(--paper)]"
             }`}
             aria-label="表情"
           >
@@ -561,11 +717,11 @@ export default function HumanChatPage() {
             onKeyDown={onKeyDown}
             placeholder="发消息..."
             rows={1}
-            className="chat-textarea flex-1 resize-none rounded-2xl border-2 border-[var(--ink)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--ink)] shadow-[3px_3px_0_var(--ink)] outline-none placeholder:text-black/35 focus:shadow-[5px_5px_0_#174BFF]"
+            className="chat-textarea flex-1 resize-none rounded-2xl border-2 border-[var(--ink)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--ink)] shadow-[3px_3px_0_var(--ink)] outline-none placeholder:text-black/35 focus:shadow-[5px_5px_0_var(--c-blue)]"
             style={{ height: "40px", maxHeight: "120px" }}
           />
 
-          <label className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border-2 border-[var(--ink)] bg-[#FFFDF2] text-xl shadow-[3px_3px_0_var(--ink)] transition hover:-translate-y-0.5">
+          <label className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border-2 border-[var(--ink)] bg-[var(--paper)] text-xl shadow-[3px_3px_0_var(--ink)] transition hover:-translate-y-0.5">
             <input
               type="file"
               accept="image/*"
@@ -582,7 +738,7 @@ export default function HumanChatPage() {
             type="button"
             onClick={send}
             disabled={sending || !canSend}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 border-[var(--ink)] bg-[#C7FF00] text-[var(--ink)] shadow-[3px_3px_0_var(--ink)] transition active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0_var(--ink)] disabled:opacity-40"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 border-[var(--ink)] bg-[var(--brand)] text-[var(--ink)] shadow-[3px_3px_0_var(--ink)] transition active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0_var(--ink)] disabled:opacity-40"
             aria-label="发送"
           >
             {sending ? (

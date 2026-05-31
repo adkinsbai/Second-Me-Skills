@@ -39,6 +39,11 @@ model User {
   resetPasswordExpiresAt DateTime? @map("reset_password_expires_at")
   shortId                String?   @unique @map("short_id")
   profileAnswers         Json?     @map("profile_answers")
+  profileCompleteness    Int       @default(0) @map("profile_completeness")  // 0-100%
+  dailyStreak            Int       @default(0) @map("daily_streak")          // 连续签到天数
+  lastCheckIn            DateTime? @map("last_check_in")                     // 上次签到时间
+  popularityScore        Int       @default(0) @map("popularity_score")       // 受欢迎度
+  viewCount              Int       @default(0) @map("view_count")            // 被查看次数
 
   sessions               Session[]
   ownerFacts             OwnerFact[]
@@ -62,6 +67,12 @@ model User {
   profileEmbedding UserEmbedding?
   matchingProfile  UserMatchingProfile?
   preferenceSignal UserPreferenceSignal?
+
+  profilePrompts         ProfilePrompt[]
+  achievements           Achievement[]
+  profileViewsGiven      ProfileView[]       @relation("ProfileViewViewer")
+  profileViewsReceived   ProfileView[]       @relation("ProfileViewed")
+  userEvents             UserEvent[]
 
   @@map("users")
 }
@@ -394,4 +405,54 @@ model TownConversationRead {
 
   @@unique([conversationId, userId])
   @@map("town_conversation_reads")
+}
+
+model ProfilePrompt {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  promptKey String   @map("prompt_key")     // e.g. "favorite_movie", "dealbreaker", "weekend_vibe"
+  answer    String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, promptKey])
+  @@map("profile_prompts")
+}
+
+model Achievement {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  badgeKey   String   @map("badge_key")      // "first_match", "chat_7_days", "ice_breaker", etc.
+  unlockedAt DateTime @default(now()) @map("unlocked_at")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeKey])
+  @@map("achievements")
+}
+
+model ProfileView {
+  id        String   @id @default(cuid())
+  viewerId  String   @map("viewer_id")
+  viewedId  String   @map("viewed_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  viewer    User     @relation("ProfileViewViewer", fields: [viewerId], references: [id], onDelete: Cascade)
+  viewed    User     @relation("ProfileViewed", fields: [viewedId], references: [id], onDelete: Cascade)
+
+  @@index([viewedId, createdAt])
+  @@index([viewerId])
+  @@map("profile_views")
+}
+
+model UserEvent {
+  id        String   @id @default(cuid())
+  userId    String?  @map("user_id")
+  eventType String   @map("event_type")     // "page_view", "swipe", "match", "chat_send", etc.
+  payload   Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([eventType, createdAt])
+  @@index([userId, createdAt])
+  @@map("user_events")
 }

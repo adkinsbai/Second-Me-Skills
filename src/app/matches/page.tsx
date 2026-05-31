@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { UpdateIntroModal } from "@/components/UpdateIntroModal";
+import { DailyCheckIn } from "@/components/DailyCheckIn";
 
 const BIO_MAX = 72;
 
@@ -82,6 +83,14 @@ function formatDate(dateString?: string): string {
 }
 
 const FEATURES = [
+  {
+    id: "achievements",
+    href: "/achievements" as string | null,
+    label: "成就中心",
+    sub: "查看徽章与签到",
+    color: "var(--c-gold)",
+    mark: "🏆",
+  },
   {
     id: "discover",
     href: "/discover" as string | null,
@@ -448,6 +457,10 @@ export default function MatchesPage() {
             ) : null}
           </section>
         ) : null}
+
+        <section className="mt-5">
+          <DailyCheckIn compact />
+        </section>
 
         <section className="mt-7">
           <div className="mb-3 flex items-center justify-between">

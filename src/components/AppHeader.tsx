@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: "/profile", label: "个人资料" },
   { href: "/settings/heartbeat", label: "匹配偏好" },
   { href: "/discover", label: "翻牌" },
+  { href: "/achievements", label: "成就" },
   { href: "/town", label: "小镇" },
 ];
 

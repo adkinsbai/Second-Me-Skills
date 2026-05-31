@@ -12,6 +12,33 @@ type UserInfo = {
   photos: string[];
 };
 
+const PROMPT_STORAGE_KEY = "qiubi_profile_prompts";
+const PROMPT_LABELS: Record<string, { icon: string; label: string }> = {
+  song: { icon: "🎵", label: "最能代表我的一首歌" },
+  weekend: { icon: "🌴", label: "我的理想周末" },
+  dealbreaker: { icon: "🚫", label: "绝对不能接受的事" },
+  drama: { icon: "📺", label: "我最近在追的剧" },
+  trivia: { icon: "🧊", label: "一个关于我的冷知识" },
+  values: { icon: "💎", label: "我最看重的价值观" },
+  firstdate: { icon: "☕", label: "我理想的第一次约会" },
+  superpower: { icon: "⚡", label: "我的超能力是" },
+};
+
+function calcCompleteness(info: UserInfo | null, promptAnswers: Record<string, string>): number {
+  if (!info) return 0;
+  let score = 0;
+  let total = 5; // name, bio, avatar, photo, prompts
+
+  if (info.name?.trim()) score++;
+  if (info.bio?.trim()) score++;
+  if (info.avatar?.trim()) score++;
+  if (info.photos?.some((p) => !!p)) score++;
+  // Prompts: at least 2 answered = 1 point
+  if (Object.keys(promptAnswers).length >= 2) score++;
+
+  return Math.round((score / total) * 100);
+}
+
 export default function ProfilePage() {
   const [info, setInfo] = useState<UserInfo | null>(null);
   const [name, setName] = useState("");
@@ -21,6 +48,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [tip, setTip] = useState<{ msg: string; ok: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [promptAnswers, setPromptAnswers] = useState<Record<string, string>>({});
   const refs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
 
   useEffect(() => {
@@ -42,6 +70,14 @@ export default function ProfilePage() {
       })
       .catch(() => null)
       .finally(() => setLoading(false));
+
+    // Load prompt answers from localStorage
+    try {
+      const raw = localStorage.getItem(PROMPT_STORAGE_KEY);
+      if (raw) setPromptAnswers(JSON.parse(raw));
+    } catch {
+      // ignore
+    }
   }, []);
 
   const handleFile = async (index: number, files: FileList | null) => {
@@ -88,6 +124,9 @@ export default function ProfilePage() {
     }
   };
 
+  const completeness = calcCompleteness(info, promptAnswers);
+  const answeredPromptIds = Object.keys(promptAnswers);
+
   if (loading) {
     return (
       <div className="page-shell flex min-h-screen items-center justify-center">
@@ -101,11 +140,50 @@ export default function ProfilePage() {
       <AppHeader backHref="/matches" title="个人资料" />
 
       <main className="mx-auto max-w-[780px] space-y-5 px-4 py-6">
+        {/* Profile completeness */}
+        <section className="rounded-2xl border-2 border-[var(--ink)] bg-[var(--card)] p-4 shadow-[4px_4px_0_var(--ink)]">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-black text-[var(--ink)]">资料完整度</p>
+              <p className="text-xs font-bold text-[var(--muted-ink)]">
+                {completeness >= 80 ? "太棒了！你的资料很完善 🎉" : "完善资料，让更多人看到你"}
+              </p>
+            </div>
+            <span
+              className={`text-2xl font-black ${
+                completeness >= 80 ? "text-[var(--brand)]" : "text-[var(--c-amber)]"
+              }`}
+            >
+              {completeness}%
+            </span>
+          </div>
+          <div className="mt-3 h-3 overflow-hidden rounded-full border-2 border-[var(--ink)] bg-[var(--paper)]">
+            <div
+              className="h-full rounded-full transition-all duration-700"
+              style={{
+                width: `${completeness}%`,
+                background:
+                  completeness >= 80
+                    ? "linear-gradient(90deg,var(--brand),var(--c-gold))"
+                    : "linear-gradient(90deg,var(--c-amber),var(--brand))",
+              }}
+            />
+          </div>
+          {completeness < 80 && (
+            <Link
+              href="/profile/prompts"
+              className="mt-3 inline-flex items-center gap-1 rounded-xl border-2 border-[var(--ink)] bg-[var(--c-blue)] px-4 py-2 text-xs font-black text-white shadow-[3px_3px_0_var(--ink)] transition hover:-translate-y-0.5"
+            >
+              ✨ 完善资料
+            </Link>
+          )}
+        </section>
+
         <section className="poster-panel flex items-center gap-4 overflow-hidden p-5">
           <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-2 border-[var(--ink)] bg-[var(--brand)] shadow-[5px_5px_0_var(--ink)]">
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={avatarUrl} alt={name || 'user avatar'} className="absolute inset-0 h-full w-full object-cover" referrerPolicy="no-referrer" />
+              <img src={avatarUrl} alt={name || "user avatar"} className="absolute inset-0 h-full w-full object-cover" referrerPolicy="no-referrer" />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center text-3xl font-black text-[var(--ink)]">
                 {(name?.[0] ?? "?").toUpperCase()}
@@ -122,6 +200,42 @@ export default function ProfilePage() {
             ) : null}
           </div>
         </section>
+
+        {/* Answered prompts cards */}
+        {answeredPromptIds.length > 0 && (
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[var(--muted-ink)]">
+                个性问答
+              </p>
+              <Link
+                href="/profile/prompts"
+                className="rounded-lg border-2 border-[var(--ink)] bg-[var(--brand)] px-2.5 py-0.5 text-[10px] font-black shadow-[2px_2px_0_var(--ink)]"
+              >
+                编辑
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {answeredPromptIds.map((pid) => {
+                const meta = PROMPT_LABELS[pid];
+                if (!meta) return null;
+                return (
+                  <div
+                    key={pid}
+                    className="rounded-2xl border-2 border-[var(--ink)] bg-[var(--card)] p-3 shadow-[3px_3px_0_var(--ink)]"
+                  >
+                    <p className="text-[10px] font-black text-[var(--ink)]/50">
+                      {meta.icon} {meta.label}
+                    </p>
+                    <p className="mt-1 text-sm font-bold text-[var(--ink)]">
+                      {promptAnswers[pid]}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         <section className="glass-card rounded-3xl p-5">
           <p className="mb-1 text-sm font-black text-[var(--ink)]">我的照片</p>
@@ -199,6 +313,16 @@ export default function ProfilePage() {
             <p className="mt-1 text-sm font-bold text-[var(--muted-ink)]">回答几个问题，让丘比更准确地理解你的关系偏好。</p>
           </div>
           <span className="rounded-xl border-2 border-[var(--ink)] bg-[var(--brand)] px-3 py-1 text-xs font-black text-[var(--ink)] shadow-[3px_3px_0_var(--ink)]">进入</span>
+        </Link>
+
+        <Link href="/profile/prompts" className="glass-card group flex items-center justify-between rounded-3xl p-5 transition hover:-translate-y-1">
+          <div>
+            <p className="font-black text-[var(--ink)]">✨ 个性问答</p>
+            <p className="mt-1 text-sm font-bold text-[var(--muted-ink)]">
+              回答有趣的问题，让别人更了解你。已答 {answeredPromptIds.length}/8
+            </p>
+          </div>
+          <span className="rounded-xl border-2 border-[var(--ink)] bg-[var(--c-blue)] px-3 py-1 text-xs font-black text-white shadow-[3px_3px_0_var(--ink)]">去回答</span>
         </Link>
       </main>
     </div>
