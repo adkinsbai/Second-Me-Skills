@@ -397,7 +397,10 @@ export default function HumanChatPage() {
       es.addEventListener("messages", (event) => {
         const incoming: BubbleMsg[] = JSON.parse(event.data);
         if (!incoming.length) return;
-        startTransition(() => mergeMessages(incoming));
+        // Filter out own messages — already handled by optimistic update + POST response
+        const targetOnly = incoming.filter((m) => m.senderType === "user_target");
+        if (!targetOnly.length) return;
+        startTransition(() => mergeMessages(targetOnly));
 
         // #3: If scrolled up, show new message indicator; else auto-scroll
         if (!isAtBottomRef.current) {
