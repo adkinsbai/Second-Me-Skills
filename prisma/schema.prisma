@@ -44,6 +44,8 @@ model User {
   lastCheckIn            DateTime? @map("last_check_in")                     // 上次签到时间
   popularityScore        Int       @default(0) @map("popularity_score")       // 受欢迎度
   viewCount              Int       @default(0) @map("view_count")            // 被查看次数
+  deletedAt              DateTime? @map("deleted_at")
+  deletionReason         String?   @map("deletion_reason")
 
   sessions               Session[]
   ownerFacts             OwnerFact[]

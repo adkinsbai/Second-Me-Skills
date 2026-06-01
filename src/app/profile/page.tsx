@@ -416,6 +416,14 @@ export default function ProfilePage() {
           </div>
           <span className="rounded-xl border-2 border-[var(--ink)] bg-[var(--c-blue)] px-3 py-1 text-xs font-black text-white shadow-[3px_3px_0_var(--ink)]">去回答</span>
         </Link>
+
+        <Link href="/settings" className="glass-card group flex items-center justify-between rounded-3xl p-5 transition hover:-translate-y-1">
+          <div>
+            <p className="font-black text-[var(--ink)]">⚙️ 设置</p>
+            <p className="mt-1 text-sm font-bold text-[var(--muted-ink)]">匹配偏好、数据导出、账号安全</p>
+          </div>
+          <span className="rounded-xl border-2 border-[var(--ink)] bg-[var(--paper-2)] px-3 py-1 text-xs font-black shadow-[3px_3px_0_var(--ink)]">进入</span>
+        </Link>
       </main>
     </div>
   );

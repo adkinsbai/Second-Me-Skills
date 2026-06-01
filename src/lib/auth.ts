@@ -80,7 +80,7 @@ export async function getCurrentUser(): Promise<{
   const sessionId = getSessionCookie();
   if (!sessionId) return null;
   const user = await prisma.user.findUnique({ where: { id: sessionId } });
-  if (!user) return null;
+  if (!user || user.deletedAt) return null;
   return {
     id: user.id,
     secondmeUserId: user.secondmeUserId ?? null,
