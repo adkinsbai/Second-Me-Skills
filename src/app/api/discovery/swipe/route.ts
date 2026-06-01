@@ -6,6 +6,11 @@ import { createConnectedMatchPair, computeCompatibilityBetween } from "@/lib/mat
 import { MATCH_THRESHOLD } from "@/lib/matchPipeline";
 import { extractProfileTraits, type UserWithPreference } from "@/lib/matchStory";
 import { hitRateLimit } from "@/lib/rateLimit";
+import { withCors, handleCorsPreflightRequest } from "@/lib/api-security";
+
+export async function OPTIONS(request: NextRequest) {
+  return handleCorsPreflightRequest(request) ?? NextResponse.next();
+}
 
 function snapshotFor(user: UserWithPreference): Prisma.InputJsonValue {
   return {
@@ -93,14 +98,17 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  return NextResponse.json({
-    code: 0,
-    data: {
-      action,
-      mutualMatch,
-      mutualLike,
-      matchId,
-      compatibilityScore,
-    },
-  });
+  return withCors(
+    NextResponse.json({
+      code: 0,
+      data: {
+        action,
+        mutualMatch,
+        mutualLike,
+        matchId,
+        compatibilityScore,
+      },
+    }),
+    request.headers.get("origin")
+  );
 }

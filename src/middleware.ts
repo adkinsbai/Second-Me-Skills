@@ -10,30 +10,42 @@ const PROTECTED_ROUTES = [
   "/settings",
   "/onboarding",
   "/match-start",
+  "/portrait",
+  "/achievements",
 ];
 
 /** Routes that are public (no auth needed) */
 const PUBLIC_ROUTES = ["/auth", "/privacy", "/intro"];
 
+/** Session cookie name — must match src/lib/auth.ts */
+const SESSION_COOKIE = "secondme_session";
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const sessionCookie = request.cookies.get("qiubi_session");
 
-  // Check if the route is protected
+  // Always allow static assets, API routes, and Next.js internals
+  if (
+    pathname.startsWith("/_next/") ||
+    pathname.startsWith("/api/") ||
+    pathname === "/favicon.ico" ||
+    pathname === "/manifest.json" ||
+    pathname.startsWith("/icons/") ||
+    pathname.startsWith("/images/")
+  ) {
+    return NextResponse.next();
+  }
+
+  const sessionCookie = request.cookies.get(SESSION_COOKIE);
+
   const isProtected = PROTECTED_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`)
   );
-
-  // Allow public routes and API routes (they handle their own auth)
-  if (pathname.startsWith("/api/") || pathname.startsWith("/_next/")) {
-    return NextResponse.next();
-  }
 
   const isPublic = PUBLIC_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`)
   );
 
-  // If protected route and no session → redirect to auth
+  // If protected route and no session → redirect to /auth
   if (isProtected && !sessionCookie) {
     const authUrl = new URL("/auth", request.url);
     authUrl.searchParams.set("redirect", pathname);
@@ -50,13 +62,12 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/discover/:path*",
-    "/matches/:path*",
-    "/town/:path*",
-    "/profile/:path*",
-    "/settings/:path*",
-    "/onboarding/:path*",
-    "/match-start/:path*",
-    "/auth/:path*",
+    /*
+     * Match all request paths except:
+     * - _next/static (static files)
+     * - _next/image  (image optimization)
+     * - favicon.ico
+     */
+    "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };

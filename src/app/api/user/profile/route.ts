@@ -1,10 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { rateLimitResponse, withCors, handleCorsPreflightRequest, validateContentType } from "@/lib/api-security";
+
+export async function OPTIONS(request: NextRequest) {
+  return handleCorsPreflightRequest(request) ?? NextResponse.next();
+}
 
 export async function POST(request: NextRequest) {
+  // CORS preflight
+  const corsPreflight = handleCorsPreflightRequest(request);
+  if (corsPreflight) return corsPreflight;
+
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
+
+  // Rate limit: 20 profile updates per 10 minutes per IP
+  const rlResponse = rateLimitResponse(request, "profile-update", 20, 10 * 60 * 1000);
+  if (rlResponse) return rlResponse;
+
+  if (!validateContentType(request)) {
+    return withCors(
+      NextResponse.json({ code: 400, message: "无效的 Content-Type" }, { status: 400 }),
+      request.headers.get("origin")
+    );
+  }
 
   const body = await request.json().catch(() => ({}));
   const name = typeof body?.name === "string" ? body.name.trim().slice(0, 50) : "";
@@ -27,6 +47,9 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  return NextResponse.json({ code: 0, message: "保存成功" });
+  return withCors(
+    NextResponse.json({ code: 0, message: "保存成功" }),
+    request.headers.get("origin")
+  );
 }
 

@@ -4,6 +4,11 @@ import { prisma } from "@/lib/db";
 import { appendOwnerFact } from "@/lib/ownerInformation";
 import { excerptForOwnerLearning } from "@/lib/humanChatLearning";
 import { hitRateLimit } from "@/lib/rateLimit";
+import { withCors, handleCorsPreflightRequest } from "@/lib/api-security";
+
+export async function OPTIONS(request: NextRequest) {
+  return handleCorsPreflightRequest(request) ?? NextResponse.next();
+}
 
 export async function GET(
   request: NextRequest,
@@ -88,10 +93,13 @@ export async function GET(
   // Prisma 取的是倒序，为了前端自然时间线，翻回正序
   const messages = messagesDesc.reverse();
 
-  return NextResponse.json({
-    code: 0,
-    data: messages,
-  });
+  return withCors(
+    NextResponse.json({
+      code: 0,
+      data: messages,
+    }),
+    request.headers.get("origin")
+  );
 }
 
 export async function POST(
@@ -171,8 +179,11 @@ export async function POST(
     })),
   });
 
-  return NextResponse.json({
-    code: 0,
-    data: { id: msg.id, senderType: msg.senderType, content: msg.content, createdAt: msg.createdAt.toISOString() },
-  });
+  return withCors(
+    NextResponse.json({
+      code: 0,
+      data: { id: msg.id, senderType: msg.senderType, content: msg.content, createdAt: msg.createdAt.toISOString() },
+    }),
+    request.headers.get("origin")
+  );
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { Toast } from "@/components/Toast";
 import type { ToastType } from "@/components/Toast";
+import { processImage } from "@/lib/image-utils";
 
 type UserInfo = {
   name: string;
@@ -105,12 +106,20 @@ export default function ProfilePage() {
     if (!files?.length) return;
     const file = files[0];
     try {
-      const url = await new Promise<string>((resolve, reject) => {
+      const rawUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result));
         reader.onerror = () => reject(new Error("read file failed"));
         reader.readAsDataURL(file);
       });
+      const url = await processImage(rawUrl, { maxWidth: 1200, quality: 0.8 }).catch((err: unknown) => {
+        if (err instanceof Error && err.message === "IMAGE_TOO_LARGE") {
+          showToast("压缩后图片仍超过 2MB，请选择更小的图片", "error");
+          return null;
+        }
+        throw err;
+      });
+      if (!url) return;
       setPhotoSlots((prev) => {
         const next = [...prev];
         next[index] = url;
@@ -126,12 +135,20 @@ export default function ProfilePage() {
     if (!files?.length) return;
     const file = files[0];
     try {
-      const url = await new Promise<string>((resolve, reject) => {
+      const rawUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result));
         reader.onerror = () => reject(new Error("read file failed"));
         reader.readAsDataURL(file);
       });
+      const url = await processImage(rawUrl, { isAvatar: true }).catch((err: unknown) => {
+        if (err instanceof Error && err.message === "IMAGE_TOO_LARGE") {
+          showToast("压缩后头像仍超过 2MB，请选择更小的图片", "error");
+          return null;
+        }
+        throw err;
+      });
+      if (!url) return;
       setAvatarUrl(url);
       showToast("头像已选择，记得保存哦", "success");
     } catch {

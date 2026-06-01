@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Toast } from "@/components/Toast";
 import type { ToastType } from "@/components/Toast";
+import { processImage } from "@/lib/image-utils";
 
 type UserInfo = {
   name?: string | null;
@@ -148,14 +149,24 @@ export function UserProfileEditor() {
               type="file"
               accept="image/*"
               className="hidden"
-              onChange={(event) => {
+              onChange={async (event) => {
                 const files = event.target.files;
                 if (!files?.length) return;
                 const file = files[0];
                 const reader = new FileReader();
-                reader.onload = () => {
-                  setAvatarUrl(String(reader.result));
-                  setToast({ msg: "头像已选择，记得保存哦", type: "success" });
+                reader.onload = async () => {
+                  try {
+                    const raw = String(reader.result);
+                    const compressed = await processImage(raw, { isAvatar: true });
+                    setAvatarUrl(compressed);
+                    setToast({ msg: "头像已选择，记得保存哦", type: "success" });
+                  } catch (err: unknown) {
+                    if (err instanceof Error && err.message === "IMAGE_TOO_LARGE") {
+                      setToast({ msg: "压缩后头像仍超过 2MB，请选择更小的图片", type: "error" });
+                    } else {
+                      setToast({ msg: "头像处理失败，请重试", type: "error" });
+                    }
+                  }
                 };
                 reader.onerror = () => {
                   setToast({ msg: "头像读取失败，请重试", type: "error" });
@@ -184,7 +195,15 @@ export function UserProfileEditor() {
                       (file) =>
                         new Promise<string>((resolve, reject) => {
                           const reader = new FileReader();
-                          reader.onload = () => resolve(String(reader.result));
+                          reader.onload = async () => {
+                            try {
+                              const raw = String(reader.result);
+                              const compressed = await processImage(raw, { maxWidth: 1200, quality: 0.8 });
+                              resolve(compressed);
+                            } catch (err) {
+                              reject(err);
+                            }
+                          };
                           reader.onerror = () => reject(new Error("read file failed"));
                           reader.readAsDataURL(file);
                         })
@@ -192,8 +211,12 @@ export function UserProfileEditor() {
                   );
                   setSelectedPhotoDataUrls(urls);
                   setToast({ msg: `${urls.length} 张照片已选择，记得保存哦`, type: "success" });
-                } catch {
-                  setToast({ msg: "图片读取失败，请重试", type: "error" });
+                } catch (err: unknown) {
+                  if (err instanceof Error && err.message === "IMAGE_TOO_LARGE") {
+                    setToast({ msg: "压缩后图片仍超过 2MB，请选择更小的图片", type: "error" });
+                  } else {
+                    setToast({ msg: "图片读取失败，请重试", type: "error" });
+                  }
                 }
               }}
             />

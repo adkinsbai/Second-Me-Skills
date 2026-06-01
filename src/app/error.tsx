@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { reportError } from "@/lib/error-report";
 
 export default function GlobalError({
   error,
@@ -10,7 +11,11 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("[GlobalError]", error);
+    reportError(error, {
+      component: "global-error-boundary",
+      level: "error",
+      extra: { digest: error.digest },
+    });
   }, [error]);
 
   return (
@@ -23,6 +28,11 @@ export default function GlobalError({
         <p className="text-sm font-bold text-white/50">
           页面加载时遇到异常，请稍后再试。
         </p>
+        {error.digest ? (
+          <p className="break-all rounded-lg bg-white/5 px-3 py-1.5 text-[10px] font-mono text-white/30">
+            错误ID: {error.digest}
+          </p>
+        ) : null}
         <button
           type="button"
           onClick={reset}
