@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: "/discover", label: "翻牌" },
   { href: "/achievements", label: "成就" },
   { href: "/town", label: "小镇" },
+  { href: "/portrait", label: "我的画像" },
 ];
 
 type AppHeaderNavRightProps = { onLogout?: () => void };

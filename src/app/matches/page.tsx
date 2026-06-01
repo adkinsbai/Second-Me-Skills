@@ -109,9 +109,9 @@ const FEATURES = [
   },
   {
     id: "agent",
-    href: null as string | null,
-    label: "我的 Agent",
-    sub: "完善资料与自我介绍",
+    href: "/portrait" as string | null,
+    label: "我的画像",
+    sub: "看看丘比怎么理解你",
     color: "var(--c-purple)",
     mark: "A",
   },

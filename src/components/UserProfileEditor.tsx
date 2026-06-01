@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Toast } from "@/components/Toast";
+import type { ToastType } from "@/components/Toast";
 
 type UserInfo = {
   name?: string | null;
@@ -19,8 +21,9 @@ export function UserProfileEditor() {
   const [photos, setPhotos] = useState<string[]>([]);
   const [selectedPhotoDataUrls, setSelectedPhotoDataUrls] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
-  const [tip, setTip] = useState("");
+  const [toast, setToast] = useState<{ msg: string; type: ToastType } | null>(null);
   const [loading, setLoading] = useState(true);
+  const avatarRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch("/api/user/info")
@@ -45,7 +48,7 @@ export function UserProfileEditor() {
 
   const saveProfile = async () => {
     setSaving(true);
-    setTip("");
+    setToast(null);
     try {
       const photo1 = selectedPhotoDataUrls[0] ?? photos[0] ?? null;
       const photo2 = selectedPhotoDataUrls[1] ?? photos[1] ?? null;
@@ -58,18 +61,18 @@ export function UserProfileEditor() {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || data?.code !== 0) {
-        setTip(data?.message || "保存失败，请稍后再试。");
+        setToast({ msg: data?.message || "保存失败，请稍后再试。", type: "error" });
         return;
       }
 
       const nextPhotos = [photo1, photo2, photo3].filter((item): item is string => typeof item === "string" && item.trim().length > 0);
       setPhotos(nextPhotos);
       setInfo((prev) => (prev ? { ...prev, name, bio, avatar: avatarUrl, selfIntroduction: bio, photos: nextPhotos } : prev));
-      setTip("已保存");
+      setToast({ msg: "资料已保存", type: "success" });
       setEditing(false);
       setSelectedPhotoDataUrls([]);
     } catch {
-      setTip("网络异常，请稍后再试。");
+      setToast({ msg: "网络异常，请稍后再试。", type: "error" });
     } finally {
       setSaving(false);
     }
@@ -80,6 +83,14 @@ export function UserProfileEditor() {
 
   return (
     <div className="glass-card rounded-2xl p-4">
+      {toast ? (
+        <Toast
+          message={toast.msg}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      ) : null}
+
       <div className="flex items-center gap-3">
         {info.avatar ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -99,13 +110,66 @@ export function UserProfileEditor() {
       {editing ? (
         <div className="mt-4 space-y-3 rounded-xl border-2 border-[var(--ink)] bg-[var(--paper-2)] p-3">
           <input value={name} onChange={(event) => setName(event.target.value)} placeholder="昵称" className="luxury-input w-full px-3 py-2 text-sm" />
-          <input value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} placeholder="头像 URL（可选）" className="luxury-input w-full px-3 py-2 text-sm" />
+
+          {/* Avatar upload */}
+          <div>
+            <span className="mb-1 block text-xs font-black text-[var(--muted-ink)]">头像</span>
+            <div className="flex items-center gap-3">
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarUrl} alt="头像预览" className="h-10 w-10 rounded-lg border-2 border-[var(--ink)] object-cover shadow-[2px_2px_0_var(--ink)]" />
+              ) : (
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg border-2 border-dashed border-[var(--ink)] bg-[var(--paper)] text-lg font-black text-[var(--ink)]">
+                  ?
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => avatarRef.current?.click()}
+                className="luxury-btn-secondary px-3 py-1.5 text-xs"
+              >
+                上传头像
+              </button>
+              {avatarUrl ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAvatarUrl("");
+                    if (avatarRef.current) avatarRef.current.value = "";
+                  }}
+                  className="rounded-lg border-2 border-[var(--ink)] bg-[var(--love)] px-2 py-1.5 text-[10px] font-black text-white shadow-[2px_2px_0_var(--ink)] transition hover:-translate-y-0.5"
+                >
+                  清除
+                </button>
+              ) : null}
+            </div>
+            <input
+              ref={avatarRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(event) => {
+                const files = event.target.files;
+                if (!files?.length) return;
+                const file = files[0];
+                const reader = new FileReader();
+                reader.onload = () => {
+                  setAvatarUrl(String(reader.result));
+                  setToast({ msg: "头像已选择，记得保存哦", type: "success" });
+                };
+                reader.onerror = () => {
+                  setToast({ msg: "头像读取失败，请重试", type: "error" });
+                };
+                reader.readAsDataURL(file);
+              }}
+            />
+          </div>
+
           <textarea value={bio} onChange={(event) => setBio(event.target.value)} rows={3} placeholder="一句自我介绍" className="luxury-input w-full px-3 py-2 text-sm" />
 
           <div className="space-y-2 rounded-xl border-2 border-[var(--ink)] bg-[var(--paper)] p-3">
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs font-black text-[var(--ink)]">可选：上传 3 张照片</p>
-              <span className="text-[11px] font-bold text-[var(--muted-ink)]">建议每张不超过 200KB</span>
             </div>
             <input
               type="file"
@@ -114,24 +178,23 @@ export function UserProfileEditor() {
               onChange={async (event) => {
                 const files = Array.from(event.target.files ?? []).slice(0, 3);
                 if (files.length === 0) return;
-                for (const file of files) {
-                  if (file.size > 200 * 1024) {
-                    alert("图片有点大，请换一张不超过 200KB 的小图。");
-                    return;
-                  }
+                try {
+                  const urls = await Promise.all(
+                    files.map(
+                      (file) =>
+                        new Promise<string>((resolve, reject) => {
+                          const reader = new FileReader();
+                          reader.onload = () => resolve(String(reader.result));
+                          reader.onerror = () => reject(new Error("read file failed"));
+                          reader.readAsDataURL(file);
+                        })
+                    )
+                  );
+                  setSelectedPhotoDataUrls(urls);
+                  setToast({ msg: `${urls.length} 张照片已选择，记得保存哦`, type: "success" });
+                } catch {
+                  setToast({ msg: "图片读取失败，请重试", type: "error" });
                 }
-                const urls = await Promise.all(
-                  files.map(
-                    (file) =>
-                      new Promise<string>((resolve, reject) => {
-                        const reader = new FileReader();
-                        reader.onload = () => resolve(String(reader.result));
-                        reader.onerror = () => reject(new Error("read file failed"));
-                        reader.readAsDataURL(file);
-                      })
-                  )
-                );
-                setSelectedPhotoDataUrls(urls);
               }}
             />
             {previewPhotos.length > 0 ? (
@@ -146,8 +209,7 @@ export function UserProfileEditor() {
             ) : null}
           </div>
 
-          <div className="flex items-center justify-between">
-            <span className={`text-xs font-black ${tip === "已保存" ? "text-[var(--ink)]" : "text-[var(--love)]"}`}>{tip}</span>
+          <div className="flex items-center justify-end">
             <button type="button" onClick={saveProfile} disabled={saving} className="luxury-btn px-3 py-1.5 text-xs disabled:opacity-60">
               {saving ? "保存中..." : "保存"}
             </button>

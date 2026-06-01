@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
+import { Toast } from "@/components/Toast";
+import type { ToastType } from "@/components/Toast";
 
 type UserInfo = {
   name: string;
@@ -46,10 +48,15 @@ export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [photoSlots, setPhotoSlots] = useState<(string | null)[]>([null, null, null]);
   const [saving, setSaving] = useState(false);
-  const [tip, setTip] = useState<{ msg: string; ok: boolean } | null>(null);
+  const [toast, setToast] = useState<{ msg: string; type: ToastType } | null>(null);
   const [loading, setLoading] = useState(true);
   const [promptAnswers, setPromptAnswers] = useState<Record<string, string>>({});
   const refs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
+  const avatarRef = useRef<HTMLInputElement>(null);
+
+  const showToast = useCallback((msg: string, type: ToastType) => {
+    setToast({ msg, type });
+  }, []);
 
   useEffect(() => {
     fetch("/api/user/info")
@@ -97,26 +104,44 @@ export default function ProfilePage() {
   const handleFile = async (index: number, files: FileList | null) => {
     if (!files?.length) return;
     const file = files[0];
-    if (file.size > 200 * 1024) {
-      setTip({ msg: "图片超过 200KB，请换一张更小的图。", ok: false });
-      return;
+    try {
+      const url = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error("read file failed"));
+        reader.readAsDataURL(file);
+      });
+      setPhotoSlots((prev) => {
+        const next = [...prev];
+        next[index] = url;
+        return next;
+      });
+      showToast(`照片 ${index + 1} 已选择，记得保存哦`, "success");
+    } catch {
+      showToast("图片读取失败，请重试", "error");
     }
-    const url = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = () => reject(new Error("read file failed"));
-      reader.readAsDataURL(file);
-    });
-    setPhotoSlots((prev) => {
-      const next = [...prev];
-      next[index] = url;
-      return next;
-    });
+  };
+
+  const handleAvatarFile = async (files: FileList | null) => {
+    if (!files?.length) return;
+    const file = files[0];
+    try {
+      const url = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error("read file failed"));
+        reader.readAsDataURL(file);
+      });
+      setAvatarUrl(url);
+      showToast("头像已选择，记得保存哦", "success");
+    } catch {
+      showToast("头像读取失败，请重试", "error");
+    }
   };
 
   const save = async () => {
     setSaving(true);
-    setTip(null);
+    setToast(null);
     try {
       const [photo1, photo2, photo3] = photoSlots.map((photo) => photo ?? null);
       const res = await fetch("/api/user/profile", {
@@ -126,13 +151,13 @@ export default function ProfilePage() {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || data?.code !== 0) {
-        setTip({ msg: data?.message || "保存失败", ok: false });
+        showToast(data?.message || "保存失败", "error");
       } else {
-        setTip({ msg: "已保存", ok: true });
+        showToast("资料已保存", "success");
         setInfo((prev) => (prev ? { ...prev, name, bio, avatar: avatarUrl } : prev));
       }
     } catch {
-      setTip({ msg: "网络异常，请稍后再试", ok: false });
+      showToast("网络异常，请稍后再试", "error");
     } finally {
       setSaving(false);
     }
@@ -152,6 +177,14 @@ export default function ProfilePage() {
   return (
     <div className="page-shell min-h-screen">
       <AppHeader backHref="/matches" title="个人资料" />
+
+      {toast ? (
+        <Toast
+          message={toast.msg}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      ) : null}
 
       <main className="mx-auto max-w-[780px] space-y-5 px-4 py-6">
         {/* Profile completeness */}
@@ -253,7 +286,7 @@ export default function ProfilePage() {
 
         <section className="glass-card rounded-3xl p-5">
           <p className="mb-1 text-sm font-black text-[var(--ink)]">我的照片</p>
-          <p className="mb-4 text-xs font-bold text-[var(--muted-ink)]">最多 3 张，每张不超过 200KB。正式上线后会升级为云存储上传。</p>
+          <p className="mb-4 text-xs font-bold text-[var(--muted-ink)]">最多 3 张，选择图片上传。</p>
           <div className="grid grid-cols-3 gap-3">
             {[0, 1, 2].map((index) => (
               <div key={index} className="relative aspect-square">
@@ -304,18 +337,46 @@ export default function ProfilePage() {
             <span className="mb-1.5 block text-xs font-black text-[var(--muted-ink)]">昵称</span>
             <input value={name} onChange={(event) => setName(event.target.value)} placeholder="你的昵称" className="luxury-input w-full px-4 py-3 text-sm" />
           </label>
-          <label className="block">
-            <span className="mb-1.5 block text-xs font-black text-[var(--muted-ink)]">头像 URL（可选）</span>
-            <input value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} placeholder="https://example.com/avatar.jpg" className="luxury-input w-full px-4 py-3 text-sm" />
-          </label>
+          <div>
+            <span className="mb-1.5 block text-xs font-black text-[var(--muted-ink)]">头像</span>
+            <div className="flex items-center gap-3">
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarUrl} alt="头像预览" className="h-14 w-14 rounded-xl border-2 border-[var(--ink)] object-cover shadow-[3px_3px_0_var(--ink)]" />
+              ) : (
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl border-2 border-dashed border-[var(--ink)] bg-[var(--paper-2)] text-xl font-black text-[var(--ink)]">
+                  ?
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => avatarRef.current?.click()}
+                className="luxury-btn-secondary px-4 py-2 text-xs"
+              >
+                上传头像
+              </button>
+              {avatarUrl ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAvatarUrl("");
+                    if (avatarRef.current) avatarRef.current.value = "";
+                  }}
+                  className="rounded-lg border-2 border-[var(--ink)] bg-[var(--love)] px-3 py-2 text-xs font-black text-white shadow-[2px_2px_0_var(--ink)] transition hover:-translate-y-0.5"
+                >
+                  清除
+                </button>
+              ) : null}
+            </div>
+            <input ref={avatarRef} type="file" accept="image/*" className="hidden" onChange={(event) => handleAvatarFile(event.target.files)} />
+          </div>
           <label className="block">
             <span className="mb-1.5 block text-xs font-black text-[var(--muted-ink)]">一句话介绍</span>
             <textarea value={bio} onChange={(event) => setBio(event.target.value)} rows={3} placeholder="简单介绍自己" className="luxury-input w-full px-4 py-3 text-sm" />
           </label>
         </section>
 
-        <div className="flex items-center justify-between gap-3">
-          {tip ? <span className={`text-sm font-black ${tip.ok ? "text-[var(--ink)]" : "text-[var(--love)]"}`}>{tip.msg}</span> : <span />}
+        <div className="flex items-center justify-end gap-3">
           <button type="button" onClick={save} disabled={saving} className="luxury-btn px-7 py-2.5 text-sm disabled:opacity-40">
             {saving ? "保存中..." : "保存资料"}
           </button>
