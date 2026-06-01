@@ -76,6 +76,10 @@ model User {
   userEvents             UserEvent[]
   messageReactions       MessageReaction[]
 
+  inviteCodesCreated     InviteCode[]        @relation("InviteCodeCreator")
+  inviteCodesUsed        InviteCode[]        @relation("InviteCodeUser")
+  creatorReward          CreatorReward?
+
   @@map("users")
 }
 
@@ -489,4 +493,33 @@ model PushSubscription {
   @@unique([userId, endpoint])
   @@index([userId])
   @@map("push_subscriptions")
+}
+
+model InviteCode {
+  id        String    @id @default(cuid())
+  code      String    @unique
+  creatorId String    @map("creator_id")
+  usedById  String?   @map("used_by_id")
+  createdAt DateTime  @default(now()) @map("created_at")
+  usedAt    DateTime? @map("used_at")
+
+  creator User  @relation("InviteCodeCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  usedBy  User? @relation("InviteCodeUser", fields: [usedById], references: [id], onDelete: SetNull)
+
+  @@index([creatorId])
+  @@index([usedById])
+  @@map("invite_codes")
+}
+
+model CreatorReward {
+  id          String   @id @default(cuid())
+  userId      String   @unique @map("user_id")
+  inviteCount Int      @default(0) @map("invite_count")
+  rewardTier  Int      @default(0) @map("reward_tier")  // 0-5
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("creator_rewards")
 }

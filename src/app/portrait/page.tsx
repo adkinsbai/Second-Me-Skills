@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
+import { PortraitPoster } from "@/components/PortraitPoster";
 
 type PortraitFact = {
   content: string;
@@ -130,6 +131,7 @@ export default function PortraitPage() {
   const [data, setData] = useState<PortraitData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showPoster, setShowPoster] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -417,6 +419,20 @@ export default function PortraitPage() {
 
         {/* Action buttons */}
         <section className="mt-10 space-y-3">
+          <button
+            onClick={() => setShowPoster(true)}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-[var(--ink)] bg-[var(--c-pink)] px-5 py-4 text-sm font-black text-white shadow-[6px_6px_0_var(--ink)] transition hover:-translate-y-1 active:translate-y-0"
+          >
+            <span>📤</span>
+            <span>生成分享海报</span>
+          </button>
+          <Link
+            href="/invite"
+            className="flex items-center justify-center gap-2 rounded-2xl border-2 border-[var(--ink)] bg-[var(--c-gold)] px-5 py-4 text-sm font-black text-[var(--ink)] shadow-[6px_6px_0_var(--ink)] transition hover:-translate-y-1 active:translate-y-0"
+          >
+            <span>🎁</span>
+            <span>邀请好友</span>
+          </Link>
           <Link
             href="/intro/quiz"
             className="flex items-center justify-center gap-2 rounded-2xl border-2 border-[var(--ink)] bg-[var(--brand)] px-5 py-4 text-sm font-black text-[var(--ink)] shadow-[6px_6px_0_var(--ink)] transition hover:-translate-y-1 active:translate-y-0"
@@ -440,6 +456,8 @@ export default function PortraitPage() {
           </Link>
         </section>
       </main>
+
+      {showPoster && <PortraitPoster onClose={() => setShowPoster(false)} />}
     </div>
   );
 }
