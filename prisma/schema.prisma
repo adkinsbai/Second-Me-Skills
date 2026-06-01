@@ -67,6 +67,7 @@ model User {
   profileEmbedding UserEmbedding?
   matchingProfile  UserMatchingProfile?
   preferenceSignal UserPreferenceSignal?
+  pushSubscriptions PushSubscription[]
 
   profilePrompts         ProfilePrompt[]
   achievements           Achievement[]
@@ -473,4 +474,19 @@ model MessageReaction {
   @@unique([messageId, userId, emoji])
   @@index([messageId])
   @@map("message_reactions")
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  endpoint  String
+  p256dh    String   @default("")
+  auth      String   @default("")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, endpoint])
+  @@index([userId])
+  @@map("push_subscriptions")
 }

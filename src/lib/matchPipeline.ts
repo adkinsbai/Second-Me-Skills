@@ -6,6 +6,8 @@ import { parseArray } from "@/lib/utils";
 
 const MAX_SCAN = 500;
 export const MATCH_THRESHOLD = 60;
+export const NEW_USER_THRESHOLD = 50;
+export const NEW_USER_DAYS = 7;
 
 export type PipelineStageStat = {
   id: string;

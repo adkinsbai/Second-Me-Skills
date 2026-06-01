@@ -5,6 +5,7 @@ import { appendOwnerFact } from "@/lib/ownerInformation";
 import { excerptForOwnerLearning } from "@/lib/humanChatLearning";
 import { hitRateLimit } from "@/lib/rateLimit";
 import { withCors, handleCorsPreflightRequest } from "@/lib/api-security";
+import { sendPush } from "@/lib/send-push";
 
 export async function OPTIONS(request: NextRequest) {
   return handleCorsPreflightRequest(request) ?? NextResponse.next();
@@ -178,6 +179,15 @@ export async function POST(
       content: safeContent,
     })),
   });
+
+  // Send push notification to recipient (fire-and-forget)
+  const senderName = user.name || "丘比用户";
+  sendPush(
+    match.targetUserId,
+    senderName,
+    safeContent.length > 60 ? safeContent.slice(0, 60) + "..." : safeContent,
+    "/matches/" + matchId,
+  ).catch(() => {});
 
   return withCors(
     NextResponse.json({
