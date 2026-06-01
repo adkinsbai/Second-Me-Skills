@@ -24,8 +24,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL(`/?error=${errorParam}`, request.url));
   }
 
-  if (!code || !TOKEN_ENDPOINT || !CLIENT_ID || !CLIENT_SECRET) {
-    return NextResponse.redirect(new URL("/?error=missing_params", request.url));
+  if (!code) {
+    return NextResponse.redirect(new URL("/auth?error=missing_code", request.url));
+  }
+  if (!TOKEN_ENDPOINT || !CLIENT_ID || !CLIENT_SECRET) {
+    return NextResponse.redirect(new URL("/auth?error=secondme_not_configured", request.url));
   }
 
   const savedState = getOauthStateCookie();

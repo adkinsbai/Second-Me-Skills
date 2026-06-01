@@ -151,11 +151,20 @@ export function LoginButton({ redirectTo = "/" }: { redirectTo?: string }) {
           {loading ? "处理中..." : mode === "register" ? "创建账号" : "登录"}
         </button>
 
+        <div className="relative my-2">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-[var(--border)]" />
+          </div>
+          <div className="relative flex justify-center text-xs">
+            <span className="bg-[var(--paper)] px-2 font-bold text-[var(--muted-ink)]">或者</span>
+          </div>
+        </div>
+
         <a
           href="/api/auth/login"
           className="inline-flex w-full items-center justify-center rounded-2xl border-2 border-[var(--ink)] bg-[var(--c-blue)] py-3 text-sm font-black text-white shadow-[4px_4px_0_var(--ink)] transition hover:-translate-y-0.5"
         >
-          使用 SecondMe 登录
+          用 SecondMe 登录
         </a>
 
         <button

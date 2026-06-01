@@ -75,11 +75,11 @@ function HomeContent() {
       <main className="page-shell min-h-screen">
         <AppHeader right={<AppHeaderNavRight onLogout={logout} />} />
         <div className="app-container space-y-6 py-8">
-          {!user.hasSecondMe ? (
+          {!user.hasSecondMe && user.authProvider !== "guest" ? (
             <div className="glass-card rounded-2xl px-4 py-3 text-sm font-bold text-[var(--muted-ink)]">
-              你当前使用的是邮箱账号。若要使用 SecondMe 实时能力，可以先绑定 SecondMe：
-              <a href="/api/auth/login" className="ml-1 font-black text-[var(--love)] underline underline-offset-2">
-                立即绑定
+              💡 可选：绑定 SecondMe 解锁更多 AI 能力
+              <a href="/api/auth/login" className="ml-1 font-black text-[var(--c-blue)] underline underline-offset-2">
+                了解更多
               </a>
             </div>
           ) : null}

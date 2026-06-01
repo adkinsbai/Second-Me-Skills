@@ -1,14 +1,16 @@
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 
-const SESSION_COOKIE = "secondme_session";
+const SESSION_COOKIE = "qiubi_session";
+/** Backward compat: read old cookie if new one is absent */
+const LEGACY_SESSION_COOKIE = "secondme_session";
 const OAUTH_STATE_COOKIE = "secondme_oauth_state";
 const REFRESH_ENDPOINT = process.env.SECONDME_REFRESH_ENDPOINT;
 const CLIENT_ID = process.env.SECONDME_CLIENT_ID;
 const CLIENT_SECRET = process.env.SECONDME_CLIENT_SECRET;
 
 export function getSessionCookie(): string | undefined {
-  return cookies().get(SESSION_COOKIE)?.value;
+  return cookies().get(SESSION_COOKIE)?.value ?? cookies().get(LEGACY_SESSION_COOKIE)?.value;
 }
 
 export function setSessionCookie(value: string) {
@@ -16,8 +18,11 @@ export function setSessionCookie(value: string) {
     path: "/",
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 7,
+    sameSite: "lax",
+    maxAge: 60 * 60 * 24 * 30,
   });
+  // Clear legacy cookie if present
+  try { cookies().delete(LEGACY_SESSION_COOKIE); } catch {}
 }
 export function setSessionCookieWithOptions(value: string, options?: { remember?: boolean }) {
   const remember = options?.remember ?? true;
@@ -25,12 +30,16 @@ export function setSessionCookieWithOptions(value: string, options?: { remember?
     path: "/",
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
     ...(remember ? { maxAge: 60 * 60 * 24 * 30 } : {}),
   });
+  // Clear legacy cookie if present
+  try { cookies().delete(LEGACY_SESSION_COOKIE); } catch {}
 }
 
 export function clearSessionCookie() {
   cookies().delete(SESSION_COOKIE);
+  try { cookies().delete(LEGACY_SESSION_COOKIE); } catch {}
 }
 
 export function setOauthStateCookie(value: string) {
@@ -38,6 +47,7 @@ export function setOauthStateCookie(value: string) {
     path: "/",
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
     maxAge: 60 * 10,
   });
 }
