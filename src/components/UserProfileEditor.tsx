@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Toast } from "@/components/Toast";
 import type { ToastType } from "@/components/Toast";
-import { processImage } from "@/lib/image-utils";
 
 type UserInfo = {
   name?: string | null;
@@ -20,10 +19,11 @@ export function UserProfileEditor() {
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);
-  const [selectedPhotoDataUrls, setSelectedPhotoDataUrls] = useState<string[]>([]);
+  const [photoSlots, setPhotoSlots] = useState<(string | null)[]>([null, null, null]);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: ToastType } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const avatarRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -35,7 +35,13 @@ export function UserProfileEditor() {
           setName(result.data.name ?? "");
           setBio(result.data.bio ?? "");
           setAvatarUrl(result.data.avatar ?? "");
-          setPhotos(Array.isArray(result.data.photos) ? result.data.photos : []);
+          const p = Array.isArray(result.data.photos) ? result.data.photos : [];
+          setPhotos(p);
+          const slots: (string | null)[] = [null, null, null];
+          p.slice(0, 3).forEach((photo: string, i: number) => {
+            slots[i] = photo || null;
+          });
+          setPhotoSlots(slots);
         }
       })
       .catch(() => null)
@@ -43,17 +49,44 @@ export function UserProfileEditor() {
   }, []);
 
   const previewPhotos = useMemo(() => {
-    if (selectedPhotoDataUrls.length > 0) return selectedPhotoDataUrls;
-    return photos;
-  }, [selectedPhotoDataUrls, photos]);
+    // Use the photoSlots (uploaded URLs) for preview
+    const filled = photoSlots.filter((p): p is string => !!p);
+    return filled.length > 0 ? filled : photos;
+  }, [photoSlots, photos]);
+
+  /** Upload a file to /api/user/upload, return the resulting URL. */
+  const uploadFile = async (file: File, type: string): Promise<string | null> => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("type", type);
+
+    setUploading((prev) => ({ ...prev, [type]: true }));
+    try {
+      const res = await fetch("/api/user/upload", {
+        method: "POST",
+        body: form,
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || data?.code !== 0) {
+        setToast({ msg: data?.message || "上传失败", type: "error" });
+        return null;
+      }
+      return data.data.url as string;
+    } catch {
+      setToast({ msg: "网络异常，上传失败", type: "error" });
+      return null;
+    } finally {
+      setUploading((prev) => ({ ...prev, [type]: false }));
+    }
+  };
 
   const saveProfile = async () => {
     setSaving(true);
     setToast(null);
     try {
-      const photo1 = selectedPhotoDataUrls[0] ?? photos[0] ?? null;
-      const photo2 = selectedPhotoDataUrls[1] ?? photos[1] ?? null;
-      const photo3 = selectedPhotoDataUrls[2] ?? photos[2] ?? null;
+      const photo1 = photoSlots[0] ?? photos[0] ?? null;
+      const photo2 = photoSlots[1] ?? photos[1] ?? null;
+      const photo3 = photoSlots[2] ?? photos[2] ?? null;
 
       const res = await fetch("/api/user/profile", {
         method: "POST",
@@ -71,7 +104,6 @@ export function UserProfileEditor() {
       setInfo((prev) => (prev ? { ...prev, name, bio, avatar: avatarUrl, selfIntroduction: bio, photos: nextPhotos } : prev));
       setToast({ msg: "资料已保存", type: "success" });
       setEditing(false);
-      setSelectedPhotoDataUrls([]);
     } catch {
       setToast({ msg: "网络异常，请稍后再试。", type: "error" });
     } finally {
@@ -116,7 +148,11 @@ export function UserProfileEditor() {
           <div>
             <span className="mb-1 block text-xs font-black text-[var(--muted-ink)]">头像</span>
             <div className="flex items-center gap-3">
-              {avatarUrl ? (
+              {uploading["avatar"] ? (
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg border-2 border-[var(--ink)] bg-[var(--paper)]">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--ink)] border-t-[var(--brand)]" />
+                </div>
+              ) : avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={avatarUrl} alt="头像预览" className="h-10 w-10 rounded-lg border-2 border-[var(--ink)] object-cover shadow-[2px_2px_0_var(--ink)]" />
               ) : (
@@ -127,7 +163,8 @@ export function UserProfileEditor() {
               <button
                 type="button"
                 onClick={() => avatarRef.current?.click()}
-                className="luxury-btn-secondary px-3 py-1.5 text-xs"
+                disabled={uploading["avatar"]}
+                className="luxury-btn-secondary px-3 py-1.5 text-xs disabled:opacity-40"
               >
                 上传头像
               </button>
@@ -153,25 +190,15 @@ export function UserProfileEditor() {
                 const files = event.target.files;
                 if (!files?.length) return;
                 const file = files[0];
-                const reader = new FileReader();
-                reader.onload = async () => {
-                  try {
-                    const raw = String(reader.result);
-                    const compressed = await processImage(raw, { isAvatar: true });
-                    setAvatarUrl(compressed);
-                    setToast({ msg: "头像已选择，记得保存哦", type: "success" });
-                  } catch (err: unknown) {
-                    if (err instanceof Error && err.message === "IMAGE_TOO_LARGE") {
-                      setToast({ msg: "压缩后头像仍超过 2MB，请选择更小的图片", type: "error" });
-                    } else {
-                      setToast({ msg: "头像处理失败，请重试", type: "error" });
-                    }
-                  }
-                };
-                reader.onerror = () => {
-                  setToast({ msg: "头像读取失败，请重试", type: "error" });
-                };
-                reader.readAsDataURL(file);
+                if (file.size > 5 * 1024 * 1024) {
+                  setToast({ msg: "图片不能超过 5MB", type: "error" });
+                  return;
+                }
+                const url = await uploadFile(file, "avatar");
+                if (url) {
+                  setAvatarUrl(url);
+                  setToast({ msg: "头像已上传", type: "success" });
+                }
               }}
             />
           </div>
@@ -189,43 +216,45 @@ export function UserProfileEditor() {
               onChange={async (event) => {
                 const files = Array.from(event.target.files ?? []).slice(0, 3);
                 if (files.length === 0) return;
-                try {
-                  const urls = await Promise.all(
-                    files.map(
-                      (file) =>
-                        new Promise<string>((resolve, reject) => {
-                          const reader = new FileReader();
-                          reader.onload = async () => {
-                            try {
-                              const raw = String(reader.result);
-                              const compressed = await processImage(raw, { maxWidth: 1200, quality: 0.8 });
-                              resolve(compressed);
-                            } catch (err) {
-                              reject(err);
-                            }
-                          };
-                          reader.onerror = () => reject(new Error("read file failed"));
-                          reader.readAsDataURL(file);
-                        })
-                    )
-                  );
-                  setSelectedPhotoDataUrls(urls);
-                  setToast({ msg: `${urls.length} 张照片已选择，记得保存哦`, type: "success" });
-                } catch (err: unknown) {
-                  if (err instanceof Error && err.message === "IMAGE_TOO_LARGE") {
-                    setToast({ msg: "压缩后图片仍超过 2MB，请选择更小的图片", type: "error" });
-                  } else {
-                    setToast({ msg: "图片读取失败，请重试", type: "error" });
+
+                // Validate sizes
+                for (const f of files) {
+                  if (f.size > 5 * 1024 * 1024) {
+                    setToast({ msg: "图片不能超过 5MB", type: "error" });
+                    return;
                   }
+                }
+
+                const typeNames = ["photo1", "photo2", "photo3"];
+                const urls: (string | null)[] = [];
+                for (let i = 0; i < files.length; i++) {
+                  const url = await uploadFile(files[i], typeNames[i]);
+                  urls.push(url);
+                }
+
+                const newSlots = [...photoSlots];
+                urls.forEach((url, i) => {
+                  if (url) newSlots[i] = url;
+                });
+                setPhotoSlots(newSlots);
+
+                const uploadedCount = urls.filter(Boolean).length;
+                if (uploadedCount > 0) {
+                  setToast({ msg: `${uploadedCount} 张照片已上传`, type: "success" });
                 }
               }}
             />
             {previewPhotos.length > 0 ? (
               <div className="grid grid-cols-3 gap-2">
                 {previewPhotos.slice(0, 3).map((photo, index) => (
-                  <div key={index} className="h-20 w-full overflow-hidden rounded-lg border-2 border-[var(--ink)] bg-[var(--paper)]">
+                  <div key={index} className="relative h-20 w-full overflow-hidden rounded-lg border-2 border-[var(--ink)] bg-[var(--paper)]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={photo} alt={`photo-${index}`} className="h-full w-full object-cover" />
+                    {uploading[`photo${index + 1}`] && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

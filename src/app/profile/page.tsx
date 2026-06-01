@@ -5,7 +5,6 @@ import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { Toast } from "@/components/Toast";
 import type { ToastType } from "@/components/Toast";
-import { processImage } from "@/lib/image-utils";
 
 type UserInfo = {
   name: string;
@@ -51,6 +50,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: ToastType } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [promptAnswers, setPromptAnswers] = useState<Record<string, string>>({});
   const refs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
   const avatarRef = useRef<HTMLInputElement>(null);
@@ -102,57 +102,67 @@ export default function ProfilePage() {
       });
   }, []);
 
+  /** Upload a file to /api/user/upload, return the resulting URL. */
+  const uploadFile = async (file: File, type: string): Promise<string | null> => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("type", type);
+
+    setUploading((prev) => ({ ...prev, [type]: true }));
+    try {
+      const res = await fetch("/api/user/upload", {
+        method: "POST",
+        body: form,
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || data?.code !== 0) {
+        showToast(data?.message || "上传失败", "error");
+        return null;
+      }
+      return data.data.url as string;
+    } catch {
+      showToast("网络异常，上传失败", "error");
+      return null;
+    } finally {
+      setUploading((prev) => ({ ...prev, [type]: false }));
+    }
+  };
+
   const handleFile = async (index: number, files: FileList | null) => {
     if (!files?.length) return;
     const file = files[0];
-    try {
-      const rawUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(new Error("read file failed"));
-        reader.readAsDataURL(file);
-      });
-      const url = await processImage(rawUrl, { maxWidth: 1200, quality: 0.8 }).catch((err: unknown) => {
-        if (err instanceof Error && err.message === "IMAGE_TOO_LARGE") {
-          showToast("压缩后图片仍超过 2MB，请选择更小的图片", "error");
-          return null;
-        }
-        throw err;
-      });
-      if (!url) return;
+
+    // Validate size client-side (5 MB)
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("图片不能超过 5MB", "error");
+      return;
+    }
+
+    const type = `photo${index + 1}`;
+    const url = await uploadFile(file, type);
+    if (url) {
       setPhotoSlots((prev) => {
         const next = [...prev];
         next[index] = url;
         return next;
       });
-      showToast(`照片 ${index + 1} 已选择，记得保存哦`, "success");
-    } catch {
-      showToast("图片读取失败，请重试", "error");
+      showToast(`照片 ${index + 1} 已上传`, "success");
     }
   };
 
   const handleAvatarFile = async (files: FileList | null) => {
     if (!files?.length) return;
     const file = files[0];
-    try {
-      const rawUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(new Error("read file failed"));
-        reader.readAsDataURL(file);
-      });
-      const url = await processImage(rawUrl, { isAvatar: true }).catch((err: unknown) => {
-        if (err instanceof Error && err.message === "IMAGE_TOO_LARGE") {
-          showToast("压缩后头像仍超过 2MB，请选择更小的图片", "error");
-          return null;
-        }
-        throw err;
-      });
-      if (!url) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("图片不能超过 5MB", "error");
+      return;
+    }
+
+    const url = await uploadFile(file, "avatar");
+    if (url) {
       setAvatarUrl(url);
-      showToast("头像已选择，记得保存哦", "success");
-    } catch {
-      showToast("头像读取失败，请重试", "error");
+      showToast("头像已上传", "success");
     }
   };
 
@@ -305,46 +315,57 @@ export default function ProfilePage() {
           <p className="mb-1 text-sm font-black text-[var(--ink)]">我的照片</p>
           <p className="mb-4 text-xs font-bold text-[var(--muted-ink)]">最多 3 张，选择图片上传。</p>
           <div className="grid grid-cols-3 gap-3">
-            {[0, 1, 2].map((index) => (
-              <div key={index} className="relative aspect-square">
-                <button
-                  type="button"
-                  onClick={() => refs[index].current?.click()}
-                  className={`h-full w-full overflow-hidden rounded-2xl border-2 border-[var(--ink)] transition active:scale-95 ${
-                    photoSlots[index] ? "bg-[var(--paper)]" : "border-dashed bg-[var(--paper-2)] hover:bg-[var(--brand)]"
-                  }`}
-                >
-                  {photoSlots[index] ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={photoSlots[index]!} alt={`photo ${index + 1}`} className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-[var(--ink)]">
-                      <span className="text-3xl font-black">+</span>
-                      <span className="text-xs font-black">上传</span>
-                    </div>
-                  )}
-                </button>
-                {photoSlots[index] ? (
+            {[0, 1, 2].map((index) => {
+              const typeKey = `photo${index + 1}`;
+              const isUploading = uploading[typeKey];
+              return (
+                <div key={index} className="relative aspect-square">
                   <button
                     type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setPhotoSlots((prev) => {
-                        const next = [...prev];
-                        next[index] = null;
-                        return next;
-                      });
-                      if (refs[index].current) refs[index].current.value = "";
-                    }}
-                    className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-[var(--ink)] bg-[var(--love)] text-sm font-black text-white"
-                    aria-label="删除照片"
+                    onClick={() => refs[index].current?.click()}
+                    disabled={isUploading}
+                    className={`h-full w-full overflow-hidden rounded-2xl border-2 border-[var(--ink)] transition active:scale-95 ${
+                      isUploading ? "opacity-50" : ""
+                    } ${
+                      photoSlots[index] ? "bg-[var(--paper)]" : "border-dashed bg-[var(--paper-2)] hover:bg-[var(--brand)]"
+                    }`}
                   >
-                    ×
+                    {isUploading ? (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--ink)] border-t-[var(--brand)]" />
+                      </div>
+                    ) : photoSlots[index] ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={photoSlots[index]!} alt={`photo ${index + 1}`} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-[var(--ink)]">
+                        <span className="text-3xl font-black">+</span>
+                        <span className="text-xs font-black">上传</span>
+                      </div>
+                    )}
                   </button>
-                ) : null}
-                <input ref={refs[index]} type="file" accept="image/*" className="hidden" onChange={(event) => handleFile(index, event.target.files)} />
-              </div>
-            ))}
+                  {photoSlots[index] && !isUploading ? (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setPhotoSlots((prev) => {
+                          const next = [...prev];
+                          next[index] = null;
+                          return next;
+                        });
+                        if (refs[index].current) refs[index].current.value = "";
+                      }}
+                      className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-[var(--ink)] bg-[var(--love)] text-sm font-black text-white"
+                      aria-label="删除照片"
+                    >
+                      ×
+                    </button>
+                  ) : null}
+                  <input ref={refs[index]} type="file" accept="image/*" className="hidden" onChange={(event) => handleFile(index, event.target.files)} />
+                </div>
+              );
+            })}
           </div>
         </section>
 
@@ -357,7 +378,11 @@ export default function ProfilePage() {
           <div>
             <span className="mb-1.5 block text-xs font-black text-[var(--muted-ink)]">头像</span>
             <div className="flex items-center gap-3">
-              {avatarUrl ? (
+              {uploading["avatar"] ? (
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl border-2 border-[var(--ink)] bg-[var(--paper)]">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--ink)] border-t-[var(--brand)]" />
+                </div>
+              ) : avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={avatarUrl} alt="头像预览" className="h-14 w-14 rounded-xl border-2 border-[var(--ink)] object-cover shadow-[3px_3px_0_var(--ink)]" />
               ) : (
@@ -368,7 +393,8 @@ export default function ProfilePage() {
               <button
                 type="button"
                 onClick={() => avatarRef.current?.click()}
-                className="luxury-btn-secondary px-4 py-2 text-xs"
+                disabled={uploading["avatar"]}
+                className="luxury-btn-secondary px-4 py-2 text-xs disabled:opacity-40"
               >
                 上传头像
               </button>
