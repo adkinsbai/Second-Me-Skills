@@ -7,6 +7,7 @@ import { LoginButton } from "@/components/LoginButton";
 import { UserProfileEditor } from "@/components/UserProfileEditor";
 import { ChatWindow } from "@/components/ChatWindow";
 import { MatchNetworkGlobe } from "@/components/MatchNetworkGlobe";
+import { BottomNav } from "@/components/BottomNav";
 
 function HomeContent() {
   const searchParams = useSearchParams();
@@ -93,7 +94,12 @@ function HomeContent() {
     );
   }
 
-  return <MatchNetworkGlobe backHref="/settings/heartbeat" title="开始匹配" />;
+  return (
+    <>
+      <MatchNetworkGlobe backHref="/settings/heartbeat" title="开始匹配" />
+      <BottomNav />
+    </>
+  );
 }
 
 export default function Home() {

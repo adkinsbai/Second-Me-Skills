@@ -42,6 +42,7 @@
   --c-purple: #8B5CFF;
   --c-amber:  #FFE500;
   --c-orange: #FF4B1F;
+  --c-gold:   #FFD700;
 }
 
 * { box-sizing: border-box; }

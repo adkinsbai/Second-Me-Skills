@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { Toast } from "@/components/Toast";
+import { BottomNav } from "@/components/BottomNav";
 import type { ToastType } from "@/components/Toast";
 
 type UserInfo = {
@@ -202,7 +203,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="page-shell min-h-screen">
+    <div className="page-shell min-h-screen pb-20">
       <AppHeader backHref="/matches" title="个人资料" />
 
       {toast ? (
@@ -214,6 +215,34 @@ export default function ProfilePage() {
       ) : null}
 
       <main className="mx-auto max-w-[780px] space-y-5 px-4 py-6">
+        {/* Quick access: 小镇 + 我的画像 */}
+        <section className="grid grid-cols-2 gap-3">
+          <Link
+            href="/town"
+            className="group relative flex h-28 items-center overflow-hidden rounded-2xl border-2 border-[var(--ink)] bg-[var(--ink)] p-4 shadow-[6px_6px_0_var(--ink)] transition hover:-translate-y-1"
+          >
+            <div className="absolute -right-4 -top-4 flex h-20 w-20 rotate-12 items-center justify-center border-2 border-[var(--ink)] text-4xl opacity-80" style={{ background: "var(--love)" }}>
+              🏘️
+            </div>
+            <div className="relative">
+              <p className="text-lg font-black text-[var(--paper)]">小镇广场</p>
+              <p className="mt-1 text-xs font-bold text-[var(--paper)]/70">发布需求，找搭子</p>
+            </div>
+          </Link>
+          <Link
+            href="/portrait"
+            className="group relative flex h-28 items-center overflow-hidden rounded-2xl border-2 border-[var(--ink)] bg-[var(--ink)] p-4 shadow-[6px_6px_0_var(--ink)] transition hover:-translate-y-1"
+          >
+            <div className="absolute -right-4 -top-4 flex h-20 w-20 rotate-12 items-center justify-center border-2 border-[var(--ink)] text-4xl opacity-80" style={{ background: "var(--c-purple)" }}>
+              🪞
+            </div>
+            <div className="relative">
+              <p className="text-lg font-black text-[var(--paper)]">我的画像</p>
+              <p className="mt-1 text-xs font-bold text-[var(--paper)]/70">看看丘比怎么理解你</p>
+            </div>
+          </Link>
+        </section>
+
         {/* Profile completeness */}
         <section className="rounded-2xl border-2 border-[var(--ink)] bg-[var(--card)] p-4 shadow-[4px_4px_0_var(--ink)]">
           <div className="flex items-center justify-between gap-3">
@@ -451,6 +480,8 @@ export default function ProfilePage() {
           <span className="rounded-xl border-2 border-[var(--ink)] bg-[var(--paper-2)] px-3 py-1 text-xs font-black shadow-[3px_3px_0_var(--ink)]">进入</span>
         </Link>
       </main>
+
+      <BottomNav />
     </div>
   );
 }

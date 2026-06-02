@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { UpdateIntroModal } from "@/components/UpdateIntroModal";
 import { DailyCheckIn } from "@/components/DailyCheckIn";
+import { BottomNav } from "@/components/BottomNav";
 
 const BIO_MAX = 72;
 
@@ -277,6 +278,7 @@ export default function MatchesPage() {
 
   const matchesLeft = Math.max(0, dailyMatchLimit - todayMatchedCount);
   const progress = dailyMatchLimit > 0 ? Math.min(100, (todayMatchedCount / dailyMatchLimit) * 100) : 0;
+  const totalUnread = list.reduce((sum, m) => sum + (m.unreadCount || 0), 0);
 
   if (loading) {
     return (
@@ -287,7 +289,7 @@ export default function MatchesPage() {
   }
 
   return (
-    <div className="page-shell min-h-screen">
+    <div className="page-shell min-h-screen pb-20">
       <style jsx global>{`
         @keyframes star-glow {
           0%, 100% { filter: drop-shadow(0 0 4px var(--c-gold)); }
@@ -583,6 +585,8 @@ export default function MatchesPage() {
       </main>
 
       <UpdateIntroModal open={updateModalOpen} onClose={() => setUpdateModalOpen(false)} />
+
+      <BottomNav unreadCount={totalUnread} />
     </div>
   );
 }
