@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { sendAchievementPush } from "@/lib/notificationHelpers";
 
 const ACHIEVEMENT_TARGETS: Record<string, number> = {
   first_match: 1,
@@ -55,10 +56,10 @@ export async function checkAchievements(userId: string): Promise<string[]> {
   // Check first_match
   const matchCount = await prisma.match.count({ where: { userId } });
   if (matchCount >= 1) {
-    if (await unlockAchievement(userId, "first_match")) unlocked.push("first_match");
+    if (await unlockAchievement(userId, "first_match")) { unlocked.push("first_match"); sendAchievementPush(userId, "first_match"); }
   }
   if (matchCount >= 10) {
-    if (await unlockAchievement(userId, "popular")) unlocked.push("popular");
+    if (await unlockAchievement(userId, "popular")) { unlocked.push("popular"); sendAchievementPush(userId, "popular"); }
   }
 
   // Check icebreaker (sent first message to 5 different people)
@@ -68,7 +69,7 @@ export async function checkAchievements(userId: string): Promise<string[]> {
     distinct: ["matchId"],
   });
   if (distinctChats.length >= 5) {
-    if (await unlockAchievement(userId, "icebreaker")) unlocked.push("icebreaker");
+    if (await unlockAchievement(userId, "icebreaker")) { unlocked.push("icebreaker"); sendAchievementPush(userId, "icebreaker"); }
   }
 
   // Check social_butterfly (3 active conversations)
@@ -81,7 +82,7 @@ export async function checkAchievements(userId: string): Promise<string[]> {
     _count: { id: true },
   });
   if (activeChats.length >= 3) {
-    if (await unlockAchievement(userId, "social_butterfly")) unlocked.push("social_butterfly");
+    if (await unlockAchievement(userId, "social_butterfly")) { unlocked.push("social_butterfly"); sendAchievementPush(userId, "social_butterfly"); }
   }
 
   // Check profile_master
@@ -90,12 +91,12 @@ export async function checkAchievements(userId: string): Promise<string[]> {
     select: { profileCompleteness: true, photo1: true },
   });
   if (user?.profileCompleteness === 100) {
-    if (await unlockAchievement(userId, "profile_master")) unlocked.push("profile_master");
+    if (await unlockAchievement(userId, "profile_master")) { unlocked.push("profile_master"); sendAchievementPush(userId, "profile_master"); }
   }
 
   // Check first_photo
   if (user?.photo1) {
-    if (await unlockAchievement(userId, "first_photo")) unlocked.push("first_photo");
+    if (await unlockAchievement(userId, "first_photo")) { unlocked.push("first_photo"); sendAchievementPush(userId, "first_photo"); }
   }
 
   // Check checkin_streak
@@ -105,7 +106,7 @@ export async function checkAchievements(userId: string): Promise<string[]> {
       select: { dailyStreak: true },
     });
     if (dbUser && dbUser.dailyStreak >= 7) {
-      if (await unlockAchievement(userId, "checkin_streak")) unlocked.push("checkin_streak");
+      if (await unlockAchievement(userId, "checkin_streak")) { unlocked.push("checkin_streak"); sendAchievementPush(userId, "checkin_streak"); }
     }
   }
 

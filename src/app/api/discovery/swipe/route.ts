@@ -7,6 +7,7 @@ import { MATCH_THRESHOLD } from "@/lib/matchPipeline";
 import { extractProfileTraits, type UserWithPreference } from "@/lib/matchStory";
 import { hitRateLimit } from "@/lib/rateLimit";
 import { withCors, handleCorsPreflightRequest } from "@/lib/api-security";
+import { sendMatchCreatedPush } from "@/lib/notificationHelpers";
 
 export async function OPTIONS(request: NextRequest) {
   return handleCorsPreflightRequest(request) ?? NextResponse.next();
@@ -76,8 +77,8 @@ export async function POST(request: NextRequest) {
         where: { viewerId_targetUserId: { viewerId: targetUserId, targetUserId: user.id } },
         select: { action: true },
       });
-      if (reciprocal?.action === "like") {
-        mutualLike = true;
+          if (reciprocal?.action === "like") {
+            mutualLike = true;
         // Check if match already exists to prevent duplicates
         const existingMatch = await tx.match.findFirst({
           where: { userId: user.id, targetUserId },
@@ -89,6 +90,9 @@ export async function POST(request: NextRequest) {
             const created = await createConnectedMatchPair(user.id, targetUserId);
             mutualMatch = true;
             matchId = created.matchId;
+            // Fire-and-forget push notifications to both users
+            sendMatchCreatedPush(user.id, target.name);
+            sendMatchCreatedPush(targetUserId, user.name);
           }
         } else {
           matchId = existingMatch.id;

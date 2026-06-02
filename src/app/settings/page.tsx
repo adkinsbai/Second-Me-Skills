@@ -30,6 +30,20 @@ export default function SettingsPage() {
       <AppHeader backHref="/profile" title="设置" />
 
       <main className="mx-auto max-w-lg px-4 py-6 space-y-4">
+        {/* Notification preferences */}
+        <Link
+          href="/settings/notifications"
+          className="glass-card group flex items-center justify-between rounded-3xl p-5 transition hover:-translate-y-1"
+        >
+          <div>
+            <p className="font-black text-[var(--ink)]">🔔 通知设置</p>
+            <p className="mt-1 text-sm text-[var(--muted-ink)]">管理推送通知、免打扰时段</p>
+          </div>
+          <span className="rounded-xl border-2 border-[var(--ink)] bg-[var(--c-pink)] px-3 py-1 text-xs font-black shadow-[3px_3px_0_var(--ink)]">
+            设置
+          </span>
+        </Link>
+
         {/* Matching preferences */}
         <Link
           href="/settings/heartbeat"

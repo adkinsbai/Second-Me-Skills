@@ -70,6 +70,7 @@ model User {
   matchingProfile  UserMatchingProfile?
   preferenceSignal UserPreferenceSignal?
   pushSubscriptions PushSubscription[]
+  notificationSettings NotificationSettings?
 
   profilePrompts         ProfilePrompt[]
   achievements           Achievement[]
@@ -524,4 +525,22 @@ model CreatorReward {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("creator_rewards")
+}
+
+model NotificationSettings {
+  id                   String   @id @default(cuid())
+  userId               String   @unique @map("user_id")
+  pushEnabled          Boolean  @default(true) @map("push_enabled")
+  quietHoursStart      Int?     @map("quiet_hours_start")   // 0-23
+  quietHoursEnd        Int?     @map("quiet_hours_end")     // 0-23
+  dailyRecommendation  Boolean  @default(true) @map("daily_recommendation")
+  reEngagement         Boolean  @default(true) @map("re_engagement")
+  matchNotification    Boolean  @default(true) @map("match_notification")
+  messageNotification  Boolean  @default(true) @map("message_notification")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_settings")
 }
