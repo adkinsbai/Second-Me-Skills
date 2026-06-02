@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { runMatchPipeline } from "@/lib/matchPipeline";
+import { getSmartRecommendations, haversineKm } from "@/lib/smartRecommendation";
 import { buildMatchStory, extractProfileTraits, type UserWithPreference } from "@/lib/matchStory";
 import { parseProfileArray } from "@/lib/utils";
 import { preferenceSignalHits, preferenceSignalScore } from "@/lib/preferenceSignals";
@@ -40,18 +40,6 @@ function normalizeMediaUrl(raw: string | null | undefined, pathBase: string): st
   return u;
 }
 
-function distanceKm(aLat?: number | null, aLng?: number | null, bLat?: number | null, bLng?: number | null) {
-  if (aLat == null || aLng == null || bLat == null || bLng == null) return null;
-  const toRad = (v: number) => (v * Math.PI) / 180;
-  const r = 6371;
-  const dLat = toRad(bLat - aLat);
-  const dLng = toRad(bLng - aLng);
-  const h =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-  return Math.round(2 * r * Math.asin(Math.sqrt(h)));
-}
-
 function photosFor(user: UserWithPreference, pathBase: string) {
   const urls = [user.photo1, user.photo2, user.photo3, user.avatarUrl]
     .map((x) => normalizeMediaUrl(typeof x === "string" ? x : null, pathBase))
@@ -72,42 +60,24 @@ export async function GET(request: NextRequest) {
   });
   if (!self) return NextResponse.json({ code: 404, message: "用户不存在" }, { status: 404 });
 
-  const [matched, swiped] = await Promise.all([
-    prisma.match.findMany({
-      where: { userId: user.id },
-      select: { targetUserId: true },
-    }),
-    prisma.userSwipeDecision.findMany({
-      where: { viewerId: user.id },
-      select: { targetUserId: true },
-    }),
-  ]);
-  const excludeIds = [
-    user.id,
-    ...matched.map((m) => m.targetUserId),
-    ...swiped.map((s) => s.targetUserId),
-  ];
+  // Use the new smart recommendation engine
+  const pipeline = await getSmartRecommendations(user.id, 20);
 
-  const pipeline = await runMatchPipeline(user.id, excludeIds);
   const selfWithPref = self as UserWithPreference;
   const ranked = pipeline.ranked
     .map((item) => {
       const candidate = item.candidate as UserWithPreference;
-      const km = distanceKm(self.latitude, self.longitude, candidate.latitude, candidate.longitude);
+      const km = haversineKm(self.latitude, self.longitude, candidate.latitude, candidate.longitude);
       const sameRegion =
         !!self.preference?.region &&
         !!candidate.preference?.region &&
         self.preference.region.trim().toLowerCase() === candidate.preference.region.trim().toLowerCase();
-      const geoBoost = km != null ? Math.max(0, 30 - Math.min(30, km / 5)) : sameRegion ? 12 : 0;
       return {
         item,
-        rankScore: item.scored.finalScore + geoBoost + preferenceSignalScore(self.preferenceSignal, candidate, { likedWeight: 8, unlikedWeight: -8 }),
         km,
         sameRegion,
       };
-    })
-    .sort((a, b) => b.rankScore - a.rankScore)
-    .slice(0, 20);
+    });
 
   const cards = ranked.map(({ item, km, sameRegion }) => {
     const candidate = item.candidate as UserWithPreference;
