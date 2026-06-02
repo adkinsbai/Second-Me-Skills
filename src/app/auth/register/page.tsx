@@ -259,7 +259,14 @@ export default function RegisterPage() {
         </div>
 
         <p className="mt-6 text-center text-xs text-[var(--muted-ink)]">
-          注册即代表同意服务协议与隐私政策
+          注册即表示同意
+          <Link href="/terms" className="font-black text-[var(--ink)] underline underline-offset-2">
+            《用户服务协议》
+          </Link>
+          和
+          <Link href="/privacy" className="font-black text-[var(--ink)] underline underline-offset-2">
+            《隐私政策》
+          </Link>
         </p>
       </div>
     </main>

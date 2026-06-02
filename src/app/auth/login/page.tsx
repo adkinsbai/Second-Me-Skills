@@ -230,7 +230,14 @@ export default function LoginPage() {
         </div>
 
         <p className="mt-6 text-center text-xs text-[var(--muted-ink)]">
-          登录即代表同意服务协议与隐私政策
+          登录即表示同意
+          <Link href="/terms" className="font-black text-[var(--ink)] underline underline-offset-2">
+            《用户服务协议》
+          </Link>
+          和
+          <Link href="/privacy" className="font-black text-[var(--ink)] underline underline-offset-2">
+            《隐私政策》
+          </Link>
         </p>
       </div>
     </main>
