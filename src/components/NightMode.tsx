@@ -29,7 +29,7 @@ export function NightModeProvider({ children }: { children: ReactNode }) {
     function check() {
       const h = new Date().getHours();
       const isNight = h >= 23 || h < 5;
-      const isLateNight = h >= 1 || (h >= 0 && h < 5);
+      const isLateNight = h >= 1 && h < 5;
       setState({ isNight, isLateNight, hour: h });
 
       // Apply / remove night-mode class on <html>

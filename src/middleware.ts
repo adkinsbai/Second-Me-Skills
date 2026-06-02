@@ -18,7 +18,7 @@ const PROTECTED_ROUTES = [
 const PUBLIC_ROUTES = ["/auth", "/privacy", "/intro"];
 
 /** Session cookie name — must match src/lib/auth.ts */
-const SESSION_COOKIE = "secondme_session";
+const SESSION_COOKIE = "qiubi_session";
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
