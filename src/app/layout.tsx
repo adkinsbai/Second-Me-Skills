@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { OnboardingRedirect } from "@/components/OnboardingRedirect";
+import { NightModeProvider, NightDecorations } from "@/components/NightMode";
 
 export const metadata: Metadata = {
   title: "丘比 - 心动社交",
@@ -15,8 +16,11 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body className="antialiased min-h-screen">
-        <OnboardingRedirect />
-        {children}
+        <NightModeProvider>
+          <NightDecorations />
+          <OnboardingRedirect />
+          {children}
+        </NightModeProvider>
       </body>
     </html>
   );

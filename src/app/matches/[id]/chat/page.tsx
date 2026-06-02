@@ -25,6 +25,7 @@ import {
   toggleReactionServer,
   type ReactionMap,
 } from "@/components/MessageReactions";
+import { useNightMode } from "@/components/NightMode";
 
 const PAGE_SIZE = 40;
 
@@ -225,6 +226,9 @@ export default function HumanChatPage() {
   const [otherTyping, setOtherTyping] = useState(false);
   const [quickReplies, setQuickReplies] = useState<string[]>([]);
   const [showQuickReplies, setShowQuickReplies] = useState(true);
+  const { isNight, isLateNight } = useNightMode();
+  const [missYouSending, setMissYouSending] = useState(false);
+  const [missYouBurst, setMissYouBurst] = useState(false);
 
   // #2: Scroll-to-bottom button
   const [showScrollBtn, setShowScrollBtn] = useState(false);
@@ -611,6 +615,52 @@ export default function HumanChatPage() {
     requestAnimationFrame(() => textareaRef.current?.focus());
   }, []);
 
+  // "想你了" button handler
+  const handleMissYou = useCallback(async () => {
+    if (missYouSending || !id) return;
+    setMissYouSending(true);
+    setMissYouBurst(true);
+    setTimeout(() => setMissYouBurst(false), 1000);
+
+    const now = new Date().toISOString();
+    const optimisticId = `miss-you-${Date.now()}`;
+    const missYouMsg: BubbleMsg = {
+      id: optimisticId,
+      senderType: "user_self",
+      content: "__MISS_YOU_SIGNAL__",
+      createdAt: now,
+      readByOther: false,
+      pending: true,
+    };
+    setMessages((prev) => {
+      const next = [...prev, missYouMsg];
+      rememberLast(next);
+      return next;
+    });
+    setTimeout(() => scrollToBottom(), 60);
+
+    try {
+      const res = await fetch(`/api/matches/${id}/miss-you`, {
+        method: "POST",
+        credentials: "include",
+      }).then((r) => r.json().catch(() => null));
+
+      if (res?.code === 0 && res?.data?.id) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === optimisticId ? { ...m, id: res.data.id, pending: false } : m
+          )
+        );
+      } else {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === optimisticId ? { ...m, pending: false, failed: true } : m))
+        );
+      }
+    } finally {
+      setMissYouSending(false);
+    }
+  }, [id, missYouSending, rememberLast, scrollToBottom]);
+
   const onInputChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
     setInput(event.target.value);
     notifyTyping();
@@ -643,6 +693,13 @@ export default function HumanChatPage() {
 
   const canSend = Boolean(input.trim() || selectedImageDataUrl);
   const guideExpanded = messages.length === 0 || showGuide;
+
+  // Night mode greeting
+  const nightGreeting = isNight
+    ? isLateNight
+      ? "夜深了，注意休息哦 🌙"
+      : "夜晚的聊天更温柔 ✨"
+    : null;
 
   // #9: Calculate days since match
   const daysSinceMatch = matchCreatedAt
@@ -709,6 +766,25 @@ export default function HumanChatPage() {
             >
               {loadingMore ? "加载中..." : "查看更早消息"}
             </button>
+          </div>
+        )}
+
+        {/* Night mode greeting */}
+        {nightGreeting && (
+          <div className="night-greeting mb-3 rounded-2xl px-4 py-2 text-center text-xs font-black text-[var(--ink)]">
+            {nightGreeting}
+          </div>
+        )}
+
+        {/* Compatibility test link */}
+        {messages.length >= 3 && (
+          <div className="mb-3 flex justify-center">
+            <Link
+              href={`/matches/${id}/compatibility`}
+              className="flex items-center gap-1.5 rounded-full border-2 border-[var(--ink)] bg-[var(--c-pink)] px-4 py-1.5 text-xs font-black text-white shadow-[3px_3px_0_var(--ink)] transition hover:-translate-y-0.5"
+            >
+              💕 测测你们的默契度
+            </Link>
           </div>
         )}
 
@@ -1028,6 +1104,19 @@ export default function HumanChatPage() {
             📷
           </label>
 
+          {/* "想你了" Miss You button */}
+          <button
+            type="button"
+            onClick={handleMissYou}
+            disabled={missYouSending}
+            className="miss-you-btn shrink-0"
+            title="想你了"
+            aria-label="想你了"
+          >
+            💕
+            {missYouBurst && <span className="heart-burst-ring" />}
+          </button>
+
           <button
             type="button"
             onClick={send}
@@ -1053,3 +1142,4 @@ export default function HumanChatPage() {
     </main>
   );
 }
+

@@ -298,6 +298,94 @@ header a.group span {
 @supports(padding-bottom:env(safe-area-inset-bottom)){.chat-input-bar{padding-bottom:calc(.75rem + env(safe-area-inset-bottom))}}
 @media(prefers-reduced-motion:reduce){.chat-bubble-self,.chat-bubble-other,.chat-typing-indicator span{animation:none!important}}
 
+/* ─── Night Mode Overrides ── */
+html.night-mode {
+  --bg:        #1a1520;
+  --paper:     #231e2a;
+  --paper-2:   #2a2432;
+  --ink:       #e8e0d4;
+  --card:      #2d2735;
+  --brand:     #C7FF00;
+  --c-pink:    #FF6B9D;
+  --c-gold:    #FFE066;
+}
+html.night-mode body {
+  background:
+    radial-gradient(circle at 7% 11%, rgba(255,107,157,0.12) 0 9rem, transparent 9.2rem),
+    radial-gradient(circle at 94% 5%, rgba(255,224,102,0.15) 0 8.5rem, transparent 8.7rem),
+    radial-gradient(circle at 82% 82%, rgba(100,80,200,0.1) 0 12rem, transparent 12.2rem),
+    linear-gradient(135deg, #1a1520 0%, #231e2a 52%, #1e1828 100%);
+}
+html.night-mode .chat-bubble-self { background: #3d3550; }
+html.night-mode .chat-bubble-other { background: #2d2735; }
+
+/* Night greeting card */
+.night-greeting {
+  background: linear-gradient(135deg, rgba(255,107,157,0.15), rgba(100,80,200,0.12));
+  border: 2px solid rgba(255,107,157,0.3);
+}
+
+/* ─── Miss You Button ── */
+.miss-you-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: var(--love);
+  color: white;
+  font-size: 1.25rem;
+  box-shadow: 3px 3px 0 var(--ink);
+  transition: transform 200ms, box-shadow 200ms;
+  cursor: pointer;
+}
+.miss-you-btn:hover { transform: scale(1.1); }
+.miss-you-btn:active { transform: scale(0.95); }
+
+@keyframes heart-burst {
+  0% { transform: scale(0); opacity: 1; }
+  50% { transform: scale(1.4); opacity: 0.8; }
+  100% { transform: scale(2); opacity: 0; }
+}
+.heart-burst-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 3px solid var(--love);
+  animation: heart-burst 0.8s ease-out forwards;
+  pointer-events: none;
+}
+
+/* Miss You special message card */
+.miss-you-card {
+  background: linear-gradient(135deg, var(--love), #FF6B9D);
+  color: white;
+  border: 2px solid var(--ink);
+  border-radius: 1.25rem;
+  padding: 1rem 1.5rem;
+  box-shadow: 4px 4px 0 var(--ink);
+  text-align: center;
+  animation: missYouPulse 2s ease-in-out infinite;
+}
+@keyframes missYouPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+@keyframes floatingHearts {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(-80px) rotate(20deg); opacity: 0; }
+}
+.floating-heart {
+  position: absolute;
+  animation: floatingHearts 1.5s ease-out forwards;
+  pointer-events: none;
+  font-size: 1.2rem;
+}
+
 /* ─── Town ── */
 .town-on-light .luxury-title{color:var(--fg)}
 .town-on-light .luxury-subtitle{color:var(--fg-3)}

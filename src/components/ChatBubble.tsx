@@ -69,7 +69,34 @@ function ImageContent({ src }: { src: string }) {
   );
 }
 
-function renderContent(content: string) {
+function renderContent(content: string, isSelf: boolean) {
+  // Special "想你了" signal
+  if (content === "__MISS_YOU_SIGNAL__") {
+    return (
+      <div className="miss-you-card relative overflow-visible">
+        <div className="text-3xl mb-1">💌</div>
+        <p className="text-base font-black">{isSelf ? "你发出了想你了" : "想你了"}</p>
+        <p className="text-xs font-bold opacity-80 mt-1">
+          {isSelf ? "对方会收到一份特别的思念 ✨" : "有人在想你哦~ 💕"}
+        </p>
+        {/* Floating hearts */}
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="floating-heart"
+            style={{
+              left: `${20 + i * 25}%`,
+              top: "10%",
+              animationDelay: `${i * 0.4}s`,
+            }}
+          >
+            ❤️
+          </span>
+        ))}
+      </div>
+    );
+  }
+
   if (content.startsWith(IMAGE_DATA_PREFIX)) {
     return <ImageContent src={content.slice(IMAGE_DATA_PREFIX.length)} />;
   }
@@ -315,7 +342,7 @@ export function ChatBubble({
           >
             {/* Reply preview inside bubble */}
             {replyToMsg && <ReplyPreview replyMsg={replyToMsg} />}
-            {renderContent(msg.content)}
+            {renderContent(msg.content, isSelf)}
           </div>
 
           {/* Reaction picker trigger - shown on hover */}
