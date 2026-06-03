@@ -37,7 +37,7 @@ export default function PrivacyPage() {
             {/* Introduction */}
             <section>
               <p className="text-sm leading-relaxed text-[var(--ink)]">
-                欢迎使用丘比（以下简称"我们"或"本平台"）。我们深知个人信息对您的重要性，并会尽全力保护您的个人信息安全。本隐私政策依据《中华人民共和国个人信息保护法》（PIPL）、《中华人民共和国网络安全法》及相关法律法规制定，旨在向您说明我们如何收集、使用、存储、共享及保护您的个人信息。
+                欢迎使用丘比（以下简称&quot;我们&quot;或&quot;本平台&quot;）。我们深知个人信息对您的重要性，并会尽全力保护您的个人信息安全。本隐私政策依据《中华人民共和国个人信息保护法》（PIPL）、《中华人民共和国网络安全法》及相关法律法规制定，旨在向您说明我们如何收集、使用、存储、共享及保护您的个人信息。
               </p>
               <p className="mt-3 text-sm leading-relaxed text-[var(--ink)]">
                 请您在使用本平台服务前，仔细阅读并充分理解本政策的全部内容。如您对本政策有任何疑问，可通过本政策末尾的联系方式与我们联系。
@@ -78,7 +78,7 @@ export default function PrivacyPage() {
                   </ul>
                 </div>
                 <p className="rounded-lg bg-[var(--c-amber)] bg-opacity-20 p-3 text-xs font-bold">
-                  ⚠️ 我们遵循"最小必要"原则，仅收集实现服务功能所必需的个人信息。
+                  ⚠️ 我们遵循&quot;最小必要&quot;原则，仅收集实现服务功能所必需的个人信息。
                 </p>
               </div>
             </section>
@@ -167,7 +167,7 @@ export default function PrivacyPage() {
                   </div>
                   <div className="rounded-xl border-2 border-[var(--ink)] bg-[var(--paper-2)] p-4">
                     <p className="mb-1 font-black text-[var(--c-blue)]">👁️ 查看与复制权</p>
-                    <p className="text-xs">您可在"个人设置"中查看和导出您的个人数据</p>
+                    <p className="text-xs">您可在&quot;个人设置&quot;中查看和导出您的个人数据</p>
                   </div>
                   <div className="rounded-xl border-2 border-[var(--ink)] bg-[var(--paper-2)] p-4">
                     <p className="mb-1 font-black text-[var(--c-blue)]">✏️ 更正与补充权</p>
@@ -179,7 +179,7 @@ export default function PrivacyPage() {
                   </div>
                 </div>
                 <p>
-                  如您需要行使上述权利，请通过应用内的"设置 → 账号与安全"功能操作，或发送邮件至我们的联系邮箱。我们将在 15 个工作日内响应您的请求。
+                  如您需要行使上述权利，请通过应用内的&quot;设置 → 账号与安全&quot;功能操作，或发送邮件至我们的联系邮箱。我们将在 15 个工作日内响应您的请求。
                 </p>
               </div>
             </section>
@@ -196,7 +196,7 @@ export default function PrivacyPage() {
                 <p>我们使用 Cookie 及类似技术来：</p>
                 <ul className="list-disc space-y-1 pl-5">
                   <li>维持您的登录状态（Session Cookie）</li>
-                  <li>记录您的偏好设置（如"记住我"功能）</li>
+                  <li>记录您的偏好设置（如&quot;记住我&quot;功能）</li>
                   <li>保障服务安全，防范恶意请求</li>
                 </ul>
                 <p>
@@ -241,7 +241,7 @@ export default function PrivacyPage() {
                   我们可能会不时修订本隐私政策。当政策发生重大变更时，我们将通过应用内通知、弹窗提示等方式告知您，并在必要时重新征得您的同意。
                 </p>
                 <p>
-                  本隐私政策的最新版本将始终在应用内的"设置 → 隐私政策"页面可供查阅。
+                  本隐私政策的最新版本将始终在应用内的&quot;设置 → 隐私政策&quot;页面可供查阅。
                 </p>
               </div>
             </section>

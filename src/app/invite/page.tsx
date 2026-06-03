@@ -18,23 +18,23 @@ export default function InvitePage() {
   const [stats, setStats] = useState<InviteStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [inputCode, setInputCode] = useState("");
+  const [inputCode, setInputCode] = useState(&quot;&quot;);
   const [redeemMsg, setRedeemMsg] = useState<string | null>(null);
   const [redeemLoading, setRedeemLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     setLoading(true);
-    fetch("/api/user/invite", { credentials: "include" })
+    fetch(&quot;/api/user/invite&quot;, { credentials: &quot;include&quot; })
       .then((r) => r.json())
       .then((result) => {
         if (result.code === 0) {
           setStats(result.data);
         } else {
-          setError(result.message || "加载失败");
+          setError(result.message || &quot;加载失败&quot;);
         }
       })
-      .catch(() => setError("网络错误"))
+      .catch(() => setError(&quot;网络错误&quot;))
       .finally(() => setLoading(false));
   }, []);
 
@@ -66,7 +66,7 @@ export default function InvitePage() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "来丘比找对象！",
+          title: &quot;来丘比找对象！&quot;,
           text: `用我的邀请码 ${stats.inviteCode} 注册丘比，获得 3 天 VIP！✨`,
           url: `${window.location.origin}/invite?code=${stats.inviteCode}`,
         });
@@ -83,25 +83,25 @@ export default function InvitePage() {
     setRedeemLoading(true);
     setRedeemMsg(null);
     try {
-      const res = await fetch("/api/user/invite", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
+      const res = await fetch(&quot;/api/user/invite&quot;, {
+        method: &quot;POST&quot;,
+        headers: { &quot;Content-Type&quot;: &quot;application/json&quot; },
+        credentials: &quot;include&quot;,
         body: JSON.stringify({ code: inputCode.trim() }),
       });
       const result = await res.json();
       if (result.code === 0) {
         setRedeemMsg(`✅ ${result.message}`);
-        setInputCode("");
+        setInputCode(&quot;&quot;);
         // Refresh stats
-        const statsRes = await fetch("/api/user/invite", { credentials: "include" });
+        const statsRes = await fetch(&quot;/api/user/invite&quot;, { credentials: &quot;include&quot; });
         const statsData = await statsRes.json();
         if (statsData.code === 0) setStats(statsData.data);
       } else {
         setRedeemMsg(`❌ ${result.message}`);
       }
     } catch {
-      setRedeemMsg("❌ 网络错误");
+      setRedeemMsg(&quot;❌ 网络错误&quot;);
     } finally {
       setRedeemLoading(false);
     }
@@ -120,7 +120,7 @@ export default function InvitePage() {
       <div className="page-shell min-h-screen">
         <AppHeader />
         <main className="mx-auto max-w-[780px] px-4 py-10 text-center">
-          <p className="text-lg font-black text-[var(--ink)]">😕 {error || "暂无数据"}</p>
+          <p className="text-lg font-black text-[var(--ink)]">😕 {error || &quot;暂无数据&quot;}</p>
           <Link
             href="/matches"
             className="mt-4 inline-block rounded-xl border-2 border-[var(--ink)] bg-[var(--brand)] px-4 py-2 text-sm font-black text-[var(--ink)] shadow-[4px_4px_0_var(--ink)]"
@@ -173,7 +173,7 @@ export default function InvitePage() {
               onClick={handleCopy}
               className="flex flex-1 items-center justify-center gap-1 rounded-xl border-2 border-[var(--ink)] bg-[var(--brand)] px-3 py-2.5 text-xs font-black text-[var(--ink)] shadow-[3px_3px_0_var(--ink)] transition hover:-translate-y-0.5 active:translate-y-0"
             >
-              {copied ? "✅ 已复制" : "📋 复制码"}
+              {copied ? &quot;✅ 已复制&quot; : &quot;📋 复制码&quot;}
             </button>
             <button
               onClick={handleCopyLink}
@@ -228,7 +228,7 @@ export default function InvitePage() {
                 >
                   <span className="text-xs font-bold text-[var(--ink)]">{u.name}</span>
                   <span className="text-[10px] font-bold text-[var(--muted-ink)]">
-                    {u.usedAt ? new Date(u.usedAt).toLocaleDateString("zh-CN") : ""}
+                    {u.usedAt ? new Date(u.usedAt).toLocaleDateString(&quot;zh-CN&quot;) : &quot;&quot;}
                   </span>
                 </div>
               ))}
@@ -247,16 +247,16 @@ export default function InvitePage() {
               type="text"
               value={inputCode}
               onChange={(e) => setInputCode(e.target.value.toUpperCase())}
-              placeholder="输入邀请码"
+              placeholder=&quot;输入邀请码&quot;
               maxLength={8}
-              className="flex-1 rounded-xl border-2 border-[var(--ink)] bg-white px-4 py-2.5 text-sm font-black text-[var(--ink)] uppercase tracking-widest shadow-[3px_3px_0_var(--ink)] placeholder:text-[var(--muted-ink)] placeholder:tracking-normal focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              className=&quot;flex-1 rounded-xl border-2 border-[var(--ink)] bg-white px-4 py-2.5 text-sm font-black text-[var(--ink)] uppercase tracking-widest shadow-[3px_3px_0_var(--ink)] placeholder:text-[var(--muted-ink)] placeholder:tracking-normal focus:outline-none focus:ring-2 focus:ring-[var(--brand)]&quot;
             />
             <button
               onClick={handleRedeem}
               disabled={redeemLoading || !inputCode.trim()}
               className="rounded-xl border-2 border-[var(--ink)] bg-[var(--brand)] px-5 py-2.5 text-sm font-black text-[var(--ink)] shadow-[3px_3px_0_var(--ink)] transition hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
             >
-              {redeemLoading ? "..." : "兑换"}
+              {redeemLoading ? &quot;...&quot; : &quot;兑换&quot;}
             </button>
           </div>
           {redeemMsg ? (

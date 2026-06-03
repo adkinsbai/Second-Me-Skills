@@ -50,7 +50,7 @@ export async function generateInviteCode(userId: string): Promise<string> {
  * - Code must not already be used
  * - Grants rewards to both parties
  */
-export async function useInviteCode(
+export async function redeemInviteCode(
   code: string,
   userId: string
 ): Promise<{ success: boolean; message: string; creatorId?: string }> {

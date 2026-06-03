@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { generateInviteCode, useInviteCode, getInviteStats } from "@/lib/inviteCodes";
+import { generateInviteCode, redeemInviteCode, getInviteStats } from "@/lib/inviteCodes";
 
 /**
  * GET /api/user/invite
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ code: 400, message: "请输入有效的邀请码" }, { status: 400 });
     }
 
-    const result = await useInviteCode(code, user.id);
+    const result = await redeemInviteCode(code, user.id);
 
     if (!result.success) {
       return NextResponse.json({ code: 400, message: result.message }, { status: 400 });

@@ -37,7 +37,7 @@ export default function TermsPage() {
             {/* Introduction */}
             <section>
               <p className="text-sm leading-relaxed text-[var(--ink)]">
-                欢迎使用丘比（Qiubi）社交平台（以下简称"本平台"）。在使用我们的服务之前，请您仔细阅读并充分理解本《用户服务协议》（以下简称"本协议"）。您注册、登录或使用本平台即视为您已阅读并同意接受本协议的全部条款。
+                欢迎使用丘比（Qiubi）社交平台（以下简称&quot;本平台&quot;）。在使用我们的服务之前，请您仔细阅读并充分理解本《用户服务协议》（以下简称&quot;本协议&quot;）。您注册、登录或使用本平台即视为您已阅读并同意接受本协议的全部条款。
               </p>
             </section>
 
