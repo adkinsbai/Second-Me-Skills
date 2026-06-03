@@ -9,51 +9,51 @@ export default function DeleteAccountPage() {
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [reason, setReason] = useState("");
-  const [mode, setMode] = useState<"soft" | "hard">(&quot;soft&quot;);
-  const [confirmText, setConfirmText] = useState(&quot;&quot;);
+  const [mode, setMode] = useState<"soft" | "hard">("soft");
+  const [confirmText, setConfirmText] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(&quot;&quot;);
-  const [step, setStep] = useState<"choose" | "confirm" | "done">(&quot;choose&quot;);
+  const [error, setError] = useState("");
+  const [step, setStep] = useState<"choose" | "confirm" | "done">("choose");
 
   const canProceed = password.length > 0;
-  const canFinalDelete = confirmText === &quot;DELETE&quot;;
+  const canFinalDelete = confirmText === "DELETE";
 
   const handleDelete = async () => {
     if (!canProceed || !canFinalDelete) return;
     setLoading(true);
-    setError(&quot;&quot;);
+    setError("");
     try {
-      const res = await fetch(&quot;/api/user/delete-account&quot;, {
-        method: &quot;POST&quot;,
-        headers: { &quot;Content-Type&quot;: &quot;application/json&quot; },
+      const res = await fetch("/api/user/delete-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password, reason, mode }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || data?.code !== 0) {
-        setError(data?.message || &quot;操作失败&quot;);
+        setError(data?.message || "操作失败");
         setLoading(false);
         return;
       }
-      setStep(&quot;done&quot;);
+      setStep("done");
     } catch {
-      setError(&quot;网络异常，请稍后再试&quot;);
+      setError("网络异常，请稍后再试");
       setLoading(false);
     }
   };
 
-  if (step === &quot;done&quot;) {
+  if (step === "done") {
     return (
       <div className="page-shell min-h-screen">
         <AppHeader backHref="/profile" title="账号注销" />
         <main className="mx-auto max-w-lg px-4 py-12 text-center">
           <div className="text-6xl mb-6">👋</div>
           <h2 className="text-2xl font-black text-[var(--ink)] mb-3">
-            {mode === &quot;soft&quot; ? &quot;账号已注销&quot; : &quot;数据已永久删除&quot;}
+            {mode === "soft" ? "账号已注销" : "数据已永久删除"}
           </h2>
           <p className="text-sm text-[var(--muted-ink)] mb-8">
-            {mode === &quot;soft&quot;
-              ? &quot;你的个人数据已匿名化处理。聊天记录已保留但无法追溯到你。感谢你曾使用丘比。&quot;
-              : &quot;你的所有数据已永久删除，无法恢复。感谢你曾使用丘比。&quot;}
+            {mode === "soft"
+              ? "你的个人数据已匿名化处理。聊天记录已保留但无法追溯到你。感谢你曾使用丘比。"
+              : "你的所有数据已永久删除，无法恢复。感谢你曾使用丘比。"}
           </p>
           <Link
             href="/"
@@ -71,7 +71,7 @@ export default function DeleteAccountPage() {
       <AppHeader backHref="/profile" title="账号注销" />
 
       <main className="mx-auto max-w-lg px-4 py-6 space-y-6">
-        {step === &quot;choose&quot; && (
+        {step === "choose" && (
           <>
             {/* Warning banner */}
             <section className="rounded-2xl border-2 border-[var(--love)] bg-[var(--love)]/10 p-5 shadow-[4px_4px_0_var(--ink)]">
@@ -94,14 +94,14 @@ export default function DeleteAccountPage() {
               <p className="text-sm font-black text-[var(--ink)] mb-3">📋 将受影响的数据</p>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 {[
-                  { icon: &quot;👤&quot;, label: &quot;个人资料&quot; },
-                  { icon: &quot;📸&quot;, label: &quot;照片与头像&quot; },
-                  { icon: &quot;💬&quot;, label: &quot;聊天消息&quot; },
-                  { icon: &quot;💝&quot;, label: &quot;匹配记录&quot; },
-                  { icon: &quot;🏆&quot;, label: &quot;成就徽章&quot; },
-                  { icon: &quot;📝&quot;, label: &quot;个性问答&quot; },
-                  { icon: &quot;🔍&quot;, label: &quot;浏览记录&quot; },
-                  { icon: &quot;📊&quot;, label: &quot;偏好数据&quot; },
+                  { icon: "👤", label: "个人资料" },
+                  { icon: "📸", label: "照片与头像" },
+                  { icon: "💬", label: "聊天消息" },
+                  { icon: "💝", label: "匹配记录" },
+                  { icon: "🏆", label: "成就徽章" },
+                  { icon: "📝", label: "个性问答" },
+                  { icon: "🔍", label: "浏览记录" },
+                  { icon: "📊", label: "偏好数据" },
                 ].map((item) => (
                   <div
                     key={item.label}
@@ -120,8 +120,8 @@ export default function DeleteAccountPage() {
 
               <button
                 type="button"
-                onClick={() => { setMode(&quot;soft&quot;); setStep(&quot;confirm&quot;); }}
-                className=&quot;w-full text-left rounded-2xl border-2 border-[var(--ink)] bg-[var(--c-amber)]/10 p-4 shadow-[3px_3px_0_var(--ink)] transition hover:-translate-y-0.5&quot;
+                onClick={() => { setMode("soft"); setStep("confirm"); }}
+                className="w-full text-left rounded-2xl border-2 border-[var(--ink)] bg-[var(--c-amber)]/10 p-4 shadow-[3px_3px_0_var(--ink)] transition hover:-translate-y-0.5"
               >
                 <p className="font-black text-[var(--ink)]">🚪 暂时离开（软注销）</p>
                 <p className="mt-1 text-xs text-[var(--muted-ink)]">
@@ -131,8 +131,8 @@ export default function DeleteAccountPage() {
 
               <button
                 type="button"
-                onClick={() => { setMode(&quot;hard&quot;); setStep(&quot;confirm&quot;); }}
-                className=&quot;w-full text-left rounded-2xl border-2 border-[var(--love)] bg-[var(--love)]/10 p-4 shadow-[3px_3px_0_var(--ink)] transition hover:-translate-y-0.5&quot;
+                onClick={() => { setMode("hard"); setStep("confirm"); }}
+                className="w-full text-left rounded-2xl border-2 border-[var(--love)] bg-[var(--love)]/10 p-4 shadow-[3px_3px_0_var(--ink)] transition hover:-translate-y-0.5"
               >
                 <p className="font-black text-[var(--love)]">🔥 永久删除（硬删除）</p>
                 <p className="mt-1 text-xs text-[var(--muted-ink)]">
@@ -152,19 +152,19 @@ export default function DeleteAccountPage() {
           </>
         )}
 
-        {step === &quot;confirm&quot; && (
+        {step === "confirm" && (
           <>
             {/* Confirmation form */}
             <section className="glass-card rounded-3xl p-5 space-y-5">
               <div className="text-center">
-                <span className="text-4xl">{mode === &quot;soft&quot; ? &quot;🚪&quot; : &quot;🔥&quot;}</span>
+                <span className="text-4xl">{mode === "soft" ? "🚪" : "🔥"}</span>
                 <h2 className="mt-2 text-lg font-black text-[var(--ink)]">
-                  {mode === &quot;soft&quot; ? &quot;确认软注销&quot; : &quot;确认永久删除&quot;}
+                  {mode === "soft" ? "确认软注销" : "确认永久删除"}
                 </h2>
                 <p className="mt-1 text-xs text-[var(--muted-ink)]">
-                  {mode === &quot;soft&quot;
-                    ? &quot;你的个人数据将被匿名化，聊天记录保留但无法追溯。&quot;
-                    : &quot;所有数据将被永久删除，此操作不可逆。&quot;}
+                  {mode === "soft"
+                    ? "你的个人数据将被匿名化，聊天记录保留但无法追溯。"
+                    : "所有数据将被永久删除，此操作不可逆。"}
                 </p>
               </div>
 
@@ -176,8 +176,8 @@ export default function DeleteAccountPage() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder=&quot;你的登录密码&quot;
-                  className=&quot;luxury-input w-full px-4 py-3 text-sm&quot;
+                  placeholder="你的登录密码"
+                  className="luxury-input w-full px-4 py-3 text-sm"
                 />
               </label>
 
@@ -188,7 +188,7 @@ export default function DeleteAccountPage() {
                 <select
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  className=&quot;luxury-input w-full px-4 py-3 text-sm&quot;
+                  className="luxury-input w-full px-4 py-3 text-sm"
                 >
                   <option value="">请选择原因...</option>
                   <option value="not_useful">找不到合适的人</option>
@@ -209,7 +209,7 @@ export default function DeleteAccountPage() {
                   value={confirmText}
                   onChange={(e) => setConfirmText(e.target.value)}
                   placeholder='输入 DELETE'
-                  className=&quot;luxury-input w-full px-4 py-3 text-sm font-mono&quot;
+                  className="luxury-input w-full px-4 py-3 text-sm font-mono"
                 />
               </div>
 
@@ -222,8 +222,8 @@ export default function DeleteAccountPage() {
               <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={() => { setStep(&quot;choose&quot;); setError(&quot;&quot;); setPassword(&quot;&quot;); setConfirmText(&quot;&quot;); }}
-                  className=&quot;luxury-btn-secondary flex-1 py-3 text-sm&quot;
+                  onClick={() => { setStep("choose"); setError(""); setPassword(""); setConfirmText(""); }}
+                  className="luxury-btn-secondary flex-1 py-3 text-sm"
                 >
                   返回
                 </button>
@@ -233,7 +233,7 @@ export default function DeleteAccountPage() {
                   disabled={!canProceed || !canFinalDelete || loading}
                   className="flex-1 rounded-2xl border-2 border-[var(--ink)] bg-[var(--love)] py-3 text-sm font-black text-white shadow-[4px_4px_0_var(--ink)] transition hover:-translate-y-0.5 disabled:opacity-40 disabled:hover:translate-y-0"
                 >
-                  {loading ? &quot;处理中...&quot; : &quot;确认注销&quot;}
+                  {loading ? "处理中..." : "确认注销"}
                 </button>
               </div>
             </section>
