@@ -4,7 +4,7 @@ import { seedUsers } from "@/lib/seedUsers";
 /**
  * POST /api/admin/seed-users
  *
- * Triggers seeding of 80 realistic users for cold start.
+ * Triggers seeding of 100 diverse realistic users for cold start & AI search testing.
  * Protected by ADMIN_SECRET env var — pass it as a Bearer token or ?secret= query param.
  *
  * Idempotent: skips users whose email already exists in the database.

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
   { href: "/matches", label: "主页" },
+  { href: "/search", label: "AI搜索" },
   { href: "/profile", label: "个人资料" },
   { href: "/settings/heartbeat", label: "匹配偏好" },
   { href: "/discover", label: "翻牌" },
