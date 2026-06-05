@@ -12,6 +12,7 @@ const PROTECTED_ROUTES = [
   "/match-start",
   "/portrait",
   "/achievements",
+  "/search",
 ];
 
 /** Routes that are public (no auth needed) */
