@@ -208,13 +208,13 @@ export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser();
     if (!user) {
-      return NextResponse.json({ error: "请先登录" }, { status: 401 });
+      return NextResponse.json({ code: -1, msg: "请先登录" }, { status: 401 });
     }
 
     const body = await req.json();
     const query = (body.query || "").trim();
     if (!query) {
-      return NextResponse.json({ error: "请输入你想找的人的描述" }, { status: 400 });
+      return NextResponse.json({ code: -1, msg: "请输入你想找的人的描述" }, { status: 400 });
     }
 
     // Step 1: DeepSeek parses natural language
@@ -228,9 +228,8 @@ export async function POST(req: NextRequest) {
     } catch (err) {
       console.error("DeepSeek parse error:", err);
       return NextResponse.json({
-        results: [],
-        explanation: "AI 暂时无法理解你的需求，请换一种方式描述",
-        query,
+        code: -1,
+        msg: "AI 暂时无法理解你的需求，请换一种方式描述",
       });
     }
 
@@ -303,24 +302,25 @@ export async function POST(req: NextRequest) {
         : `没有找到完全符合"${explanation}"的人，试试放宽条件？`;
 
     return NextResponse.json({
-      results: scored.map((r) => ({
-        id: r.id,
-        name: r.name,
-        age: r.age,
-        gender: r.gender,
-        bio: r.bio,
-        avatarUrl: r.avatarUrl,
-        photo1: r.photo1,
-        matchScore: r.score,
-        matchReasons: r.reasons,
-        region: r.region,
-      })),
-      explanation: aiSummary,
-      criteria,
-      query,
+      code: 0,
+      data: {
+        summary: aiSummary,
+        matches: scored.map((r) => ({
+          id: r.id,
+          name: r.name,
+          age: r.age,
+          gender: r.gender,
+          bio: r.bio,
+          avatarUrl: r.avatarUrl,
+          photo1: r.photo1,
+          matchScore: r.score,
+          matchReasons: r.reasons,
+          region: r.region,
+        })),
+      },
     });
   } catch (err) {
     console.error("Search API error:", err);
-    return NextResponse.json({ error: "搜索出错了，请稍后再试" }, { status: 500 });
+    return NextResponse.json({ code: -1, msg: "搜索出错了，请稍后再试" }, { status: 500 });
   }
 }
