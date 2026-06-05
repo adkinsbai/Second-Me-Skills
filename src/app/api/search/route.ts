@@ -3,13 +3,102 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 
 /* ──────────────────────────────────────────────────────────────
- *  AI Natural Language Search API
+ *  AI Natural Language Search API  (DeepSeek powered)
  *  POST /api/search
  *  Body: { query: string }
  *  Returns matched user profiles with AI reasoning
  * ────────────────────────────────────────────────────────────── */
 
-type CandidateRow = {
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
+const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com";
+
+type SearchCriteria = {
+  gender?: "male" | "female";
+  ageMin?: number;
+  ageMax?: number;
+  cities?: string[];
+  interests?: string[];
+  personality?: string[];
+  education?: string;
+  occupation?: string[];
+  hasHouse?: boolean;
+  hasCar?: boolean;
+  travelExperience?: string[];
+  keywords?: string[];
+};
+
+// ── DeepSeek: parse natural language into structured criteria ──
+
+async function parseQueryWithAI(query: string): Promise<{ criteria: SearchCriteria; explanation: string }> {
+  if (!DEEPSEEK_API_KEY) {
+    throw new Error("DEEPSEEK_API_KEY not configured");
+  }
+
+  const systemPrompt = `你是一个交友App的AI搜索助手。用户会用自然语言描述想找的理想对象，你需要解析成结构化JSON。
+
+返回JSON对象，包含两个字段：
+1. "criteria" — 结构化搜索条件
+2. "explanation" — 中文简短说明理解的需求（1-2句话）
+
+criteria字段（全部可选，没提到就不填）：
+- gender: "male" 或 "female"
+- ageMin, ageMax: 年龄范围
+- cities: 城市列表，如["上海","杭州"]
+- interests: 兴趣爱好，如["读书","旅行","摄影","编程","做饭"]
+- personality: 性格特质，如["温柔","上进","幽默","独立","善良"]
+- education: 学历，如"本科","硕士","博士"
+- occupation: 职业，如["程序员","设计师","医生","老师"]
+- hasHouse: 是否要求有房
+- hasCar: 是否要求有车
+- travelExperience: 去过的地方，如["美国","日本","欧洲"]
+- keywords: 其他关键词
+
+注意：
+- "有上进心""三观正""经济条件好"→ personality或keywords
+- "在上海工作"→ cities:["上海"]
+- "25到30岁"→ ageMin:25, ageMax:30
+- "去过美国"→ travelExperience:["美国"]
+- "会弹吉他""喜欢摄影"→ interests:["吉他","摄影"]
+- "做IT的""程序员"→ occupation:["程序员"]
+- 只返回JSON，不要其他文字`;
+
+  const resp = await fetch(`${DEEPSEEK_BASE_URL}/v1/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: "deepseek-chat",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: query },
+      ],
+      temperature: 0.1,
+      max_tokens: 500,
+    }),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`DeepSeek API error: ${resp.status} ${err}`);
+  }
+
+  const data = await resp.json();
+  const content = data.choices?.[0]?.message?.content || "";
+
+  try {
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("No JSON found");
+    return JSON.parse(jsonMatch[0]);
+  } catch {
+    return { criteria: {}, explanation: `理解了你的需求：${query}` };
+  }
+}
+
+// ── Scoring ──
+
+type Candidate = {
   id: string;
   name: string | null;
   age: number | null;
@@ -19,359 +108,219 @@ type CandidateRow = {
   photo1: string | null;
   photo2: string | null;
   photo3: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  keywords: string | null;
-  matchTypes: string | null;
-  activityTags: string | null;
-  chatPace: string | null;
-  meetPreference: string | null;
-  emotionStyle: string | null;
   region: string | null;
+  keywords: string | null;
+  activityTags: string | null;
+  occupation: string | null;
   profileAnswers: unknown;
+  popularityScore: number;
 };
 
-// Simple Chinese keyword extraction
-const GENDER_MAP: Record<string, string> = {
-  "男": "male", "男生": "male", "男孩": "male", "帅哥": "male", "小哥哥": "male", "男性": "male",
-  "女": "female", "女生": "female", "女孩": "female", "美女": "female", "小姐姐": "female", "女性": "female",
-};
-
-const REGION_KEYWORDS = [
-  "北京", "上海", "广州", "深圳", "杭州", "成都", "重庆", "武汉", "南京", "西安",
-  "苏州", "天津", "长沙", "郑州", "青岛", "厦门", "昆明", "合肥", "福州", "济南",
-  "东北", "四川", "广东", "浙江", "江苏", "山东", "河南", "湖北", "湖南", "福建",
-];
-
-const INTEREST_KEYWORDS = [
-  "读书", "阅读", "电影", "音乐", "旅行", "旅游", "健身", "运动", "跑步", "游泳",
-  "摄影", "画画", "绘画", "游戏", "打游戏", "做饭", "烹饪", "烘焙", "咖啡", "茶",
-  "猫", "狗", "宠物", "户外", "登山", "徒步", "露营", "滑雪", "冲浪", "瑜伽",
-  "编程", "科技", "动漫", "二次元", "追剧", "综艺", "展览", "博物馆", "话剧", "音乐会",
-  "创业", "投资", "理财", "美食", "火锅", "烧烤", "日料", "韩料", "西餐",
-  "篮球", "足球", "网球", "羽毛球", "乒乓球", "电竞", "LOL", "王者", "原神",
-  "写作", "日记", "冥想", "心理学", "哲学", "天文", "植物", "花艺",
-];
-
-const PERSONALITY_KEYWORDS = [
-  "温柔", "可爱", "有趣", "幽默", "成熟", "稳重", "活泼", "开朗", "安静", "内向",
-  "外向", "细心", "体贴", "浪漫", "专一", "独立", "自信", "善良", "真诚", "上进",
-  "文艺", "阳光", "酷", "潮", "理性", "感性", "佛系", "热血", "佛系", "慢热",
-];
-
-function haversineKm(
-  lat1: number, lng1: number,
-  lat2: number, lng2: number,
-): number {
-  const toRad = (v: number) => (v * Math.PI) / 180;
-  const R = 6371;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function extractCriteria(query: string) {
-  const q = query.toLowerCase();
-  const criteria: {
-    gender?: string;
-    ageMin?: number;
-    ageMax?: number;
-    region?: string;
-    interests: string[];
-    personalities: string[];
-    keywords: string[];
-  } = {
-    interests: [],
-    personalities: [],
-    keywords: [],
-  };
-
-  // Gender
-  for (const [cn, en] of Object.entries(GENDER_MAP)) {
-    if (query.includes(cn)) { criteria.gender = en; break; }
-  }
-
-  // Age range
-  const ageRangeMatch = query.match(/(\d{2})\s*[-到至~]\s*(\d{2})\s*岁/);
-  if (ageRangeMatch) {
-    criteria.ageMin = parseInt(ageRangeMatch[1]);
-    criteria.ageMax = parseInt(ageRangeMatch[2]);
-  }
-  const ageAbove = query.match(/(\d{2})\s*岁以[上大]/);
-  if (ageAbove) criteria.ageMin = parseInt(ageAbove[1]);
-  const ageBelow = query.match(/(\d{2})\s*岁以[下小]/);
-  if (ageBelow) criteria.ageMax = parseInt(ageBelow[1]);
-
-  // Region
-  for (const r of REGION_KEYWORDS) {
-    if (query.includes(r)) { criteria.region = r; break; }
-  }
-
-  // Interests
-  for (const tag of INTEREST_KEYWORDS) {
-    if (q.includes(tag)) criteria.interests.push(tag);
-  }
-
-  // Personality
-  for (const tag of PERSONALITY_KEYWORDS) {
-    if (q.includes(tag)) criteria.personalities.push(tag);
-  }
-
-  // Fallback: extract remaining meaningful words (>1 char, not common)
-  const commonWords = new Set([
-    "的", "了", "在", "是", "我", "有", "和", "就", "不", "人", "都", "一",
-    "一个", "上", "也", "很", "到", "说", "要", "去", "你", "会", "着", "没有",
-    "看", "好", "自己", "这", "他", "她", "吗", "想要", "想找", "希望", "喜欢",
-    "想找一个", "喜欢的", "想要的", "什么样", "什么", "样的", "那种", "那种的",
-    "岁", "左右", "比较", "非常", "特别", "超级", "最", "能", "可以", "一起",
-    "最好", "然后", "或者", "但是", "因为", "所以", "如果", "虽然", "而且",
-    "恋爱", "对象", "另一半", "伴侣", "朋友", "搭子", "伙伴",
-  ]);
-  // Don't add duplicates
-  const existingSet = new Set([...criteria.interests, ...criteria.personalities, criteria.region ?? ""]);
-  const words = query.replace(/[，。！？、；：""''（）\[\]{},.?;:!'"()\s]+/g, " ").split(" ");
-  for (const w of words) {
-    if (w.length >= 2 && !commonWords.has(w) && !existingSet.has(w) && criteria.keywords.length < 10) {
-      criteria.keywords.push(w);
-    }
-  }
-
-  return criteria;
-}
-
-function scoreCandidate(
-  c: CandidateRow,
-  criteria: ReturnType<typeof extractCriteria>,
-  viewerLat: number | null,
-  viewerLng: number | null,
-): { score: number; reasons: string[] } {
-  let score = 50; // base
+function scoreCandidate(c: Candidate, criteria: SearchCriteria): { score: number; reasons: string[] } {
+  let score = 50;
   const reasons: string[] = [];
 
-  // Gender filter
+  // Gender hard filter
   if (criteria.gender && c.gender && c.gender !== criteria.gender) {
-    return { score: -1, reasons: ["性别不匹配"] };
+    return { score: -1, reasons: [] };
   }
 
-  // Age
-  if (criteria.ageMin && c.age && c.age < criteria.ageMin) {
-    return { score: -1, reasons: ["年龄不符"] };
-  }
-  if (criteria.ageMax && c.age && c.age > criteria.ageMax) {
-    return { score: -1, reasons: ["年龄不符"] };
+  // Age hard filter
+  if (c.age) {
+    if (criteria.ageMin && c.age < criteria.ageMin) return { score: -1, reasons: [] };
+    if (criteria.ageMax && c.age > criteria.ageMax) return { score: -1, reasons: [] };
   }
 
-  // Region
-  if (criteria.region && c.region) {
-    if (c.region.includes(criteria.region) || criteria.region.includes(c.region)) {
+  // City match
+  if (criteria.cities?.length && c.region) {
+    const matched = criteria.cities.some((city) => c.region?.includes(city));
+    if (matched) {
       score += 20;
-      reasons.push(`同在${criteria.region}地区`);
+      reasons.push(`📍 ${c.region}`);
     }
   }
 
-  // Distance bonus
-  if (viewerLat != null && viewerLng != null && c.latitude != null && c.longitude != null) {
-    const km = haversineKm(viewerLat, viewerLng, c.latitude, c.longitude);
-    if (km < 10) { score += 15; reasons.push("距离很近"); }
-    else if (km < 50) { score += 8; reasons.push("距离较近"); }
-  }
+  // Interest match (from keywords + activityTags + bio)
+  const searchText = [c.keywords, c.activityTags, c.bio, JSON.stringify(c.profileAnswers || "")]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
 
-  // Profile text for matching
-  const profileText = [
-    c.bio ?? "",
-    c.keywords ?? "",
-    c.matchTypes ?? "",
-    c.activityTags ?? "",
-    c.chatPace ?? "",
-    c.meetPreference ?? "",
-    c.emotionStyle ?? "",
-    JSON.stringify(c.profileAnswers ?? {}),
-  ].join(" ").toLowerCase();
-
-  // Interest match
-  let interestHits = 0;
-  for (const tag of criteria.interests) {
-    if (profileText.includes(tag)) {
-      interestHits++;
-      reasons.push(`兴趣相投：${tag}`);
+  if (criteria.interests?.length) {
+    for (const interest of criteria.interests) {
+      if (searchText.includes(interest.toLowerCase())) {
+        score += 12;
+        reasons.push(`🎯 喜欢${interest}`);
+      }
     }
   }
-  score += interestHits * 12;
 
   // Personality match
-  let personalityHits = 0;
-  for (const tag of criteria.personalities) {
-    if (profileText.includes(tag)) {
-      personalityHits++;
-      reasons.push(`性格契合：${tag}`);
+  if (criteria.personality?.length) {
+    for (const trait of criteria.personality) {
+      if (searchText.includes(trait.toLowerCase())) {
+        score += 10;
+        reasons.push(`✨ ${trait}`);
+      }
     }
   }
-  score += personalityHits * 10;
 
-  // General keyword match
-  let keywordHits = 0;
-  for (const kw of criteria.keywords) {
-    if (profileText.includes(kw)) {
-      keywordHits++;
+  // Occupation match
+  if (criteria.occupation?.length) {
+    const occText = (c.occupation || "") + " " + (c.bio || "");
+    for (const occ of criteria.occupation) {
+      if (occText.toLowerCase().includes(occ.toLowerCase())) {
+        score += 15;
+        reasons.push(`💼 ${occ}`);
+      }
     }
   }
-  score += keywordHits * 6;
-  if (keywordHits > 0) reasons.push(`匹配${keywordHits}个关键词`);
 
-  // Bio completeness bonus
-  if (c.bio && c.bio.length > 20) score += 5;
-  if (c.photo1) score += 3;
+  // Travel experience
+  if (criteria.travelExperience?.length) {
+    for (const place of criteria.travelExperience) {
+      if (searchText.includes(place)) {
+        score += 15;
+        reasons.push(`✈️ 去过${place}`);
+      }
+    }
+  }
 
-  return { score: Math.min(100, Math.max(0, score)), reasons };
+  // Keyword fuzzy match
+  if (criteria.keywords?.length) {
+    for (const kw of criteria.keywords) {
+      if (searchText.includes(kw.toLowerCase())) {
+        score += 6;
+        reasons.push(kw);
+      }
+    }
+  }
+
+  // Popularity bonus
+  score += Math.min(10, Math.floor((c.popularityScore || 0) / 10));
+
+  return { score: Math.min(99, Math.max(1, score)), reasons: reasons.slice(0, 5) };
 }
+
+// ── Main handler ──
 
 export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser();
     if (!user) {
-      return NextResponse.json({ code: -1, msg: "请先登录" }, { status: 401 });
+      return NextResponse.json({ error: "请先登录" }, { status: 401 });
     }
 
-    const body = await req.json().catch(() => ({}));
-    const query = (body.query ?? "").trim();
-    if (!query || query.length < 2) {
-      return NextResponse.json({ code: -1, msg: "请输入搜索内容" }, { status: 400 });
-    }
-    if (query.length > 500) {
-      return NextResponse.json({ code: -1, msg: "搜索内容过长" }, { status: 400 });
+    const body = await req.json();
+    const query = (body.query || "").trim();
+    if (!query) {
+      return NextResponse.json({ error: "请输入你想找的人的描述" }, { status: 400 });
     }
 
-    const criteria = extractCriteria(query);
+    // Step 1: DeepSeek parses natural language
+    let criteria: SearchCriteria;
+    let explanation: string;
 
-    // Build Prisma where clause
-    const where: Record<string, unknown>[] = [
-      { id: { not: user.id } },      // exclude self
-      { deletedAt: null },            // not deleted
-      { onboardingDone: true },       // completed onboarding
-    ];
+    try {
+      const parsed = await parseQueryWithAI(query);
+      criteria = parsed.criteria;
+      explanation = parsed.explanation;
+    } catch (err) {
+      console.error("DeepSeek parse error:", err);
+      return NextResponse.json({
+        results: [],
+        explanation: "AI 暂时无法理解你的需求，请换一种方式描述",
+        query,
+      });
+    }
+
+    // Step 2: Build Prisma query
+    const where: Record<string, unknown> = {
+      id: { not: user.id },
+      role: { not: "admin" },
+      deletedAt: null,
+    };
 
     if (criteria.gender) {
-      where.push({ gender: criteria.gender });
+      where.gender = criteria.gender;
     }
-    if (criteria.ageMin) {
-      where.push({ age: { gte: criteria.ageMin } });
-    }
-    if (criteria.ageMax) {
-      where.push({ age: { lte: criteria.ageMax } });
+    if (criteria.ageMin || criteria.ageMax) {
+      where.age = {};
+      if (criteria.ageMin) (where.age as Record<string, number>).gte = criteria.ageMin;
+      if (criteria.ageMax) (where.age as Record<string, number>).lte = criteria.ageMax;
     }
 
-    // Fetch candidates (limited scan)
+    // Step 3: Query with preference relation
     const candidates = await prisma.user.findMany({
-      where: { AND: where },
-      select: {
-        id: true,
-        name: true,
-        age: true,
-        gender: true,
-        bio: true,
-        avatarUrl: true,
-        photo1: true,
-        photo2: true,
-        photo3: true,
-        latitude: true,
-        longitude: true,
+      where,
+      include: {
         preference: {
           select: {
+            region: true,
             keywords: true,
             matchTypes: true,
             activityTags: true,
             chatPace: true,
             meetPreference: true,
             emotionStyle: true,
-            region: true,
           },
         },
-        profileAnswers: true,
-        profileCompleteness: true,
       },
-      orderBy: { profileCompleteness: "desc" },
       take: 500,
     });
 
-    // Get viewer location
-    const viewer = await prisma.user.findUnique({
-      where: { id: user.id },
-      select: { latitude: true, longitude: true },
-    });
+    // Step 4: Flatten and score
+    const enriched: Candidate[] = candidates.map((u) => ({
+      id: u.id,
+      name: u.name,
+      age: u.age,
+      gender: u.gender,
+      bio: u.bio,
+      avatarUrl: u.avatarUrl,
+      photo1: u.photo1,
+      photo2: u.photo2,
+      photo3: u.photo3,
+      region: u.preference?.region || null,
+      keywords: u.preference?.keywords || null,
+      activityTags: u.preference?.activityTags || null,
+      occupation: null, // Not in schema, use bio
+      profileAnswers: u.profileAnswers,
+      popularityScore: u.popularityScore,
+    }));
 
-    // Score and sort
-    const scored = candidates
+    const scored = enriched
       .map((c) => {
-        const row: CandidateRow = {
-          id: c.id,
-          name: c.name,
-          age: c.age,
-          gender: c.gender,
-          bio: c.bio,
-          avatarUrl: c.avatarUrl,
-          photo1: c.photo1,
-          photo2: c.photo2,
-          photo3: c.photo3,
-          latitude: c.latitude,
-          longitude: c.longitude,
-          keywords: c.preference?.keywords ?? null,
-          matchTypes: c.preference?.matchTypes ?? null,
-          activityTags: c.preference?.activityTags ?? null,
-          chatPace: c.preference?.chatPace ?? null,
-          meetPreference: c.preference?.meetPreference ?? null,
-          emotionStyle: c.preference?.emotionStyle ?? null,
-          region: c.preference?.region ?? null,
-          profileAnswers: c.profileAnswers,
-        };
-        const result = scoreCandidate(row, criteria, viewer?.latitude ?? null, viewer?.longitude ?? null);
-        return {
-          id: c.id,
-          name: c.name,
-          age: c.age,
-          gender: c.gender,
-          bio: c.bio,
-          avatarUrl: c.avatarUrl,
-          photos: [c.photo1, c.photo2, c.photo3].filter(Boolean) as string[],
-          score: result.score,
-          reasons: result.reasons,
-          region: c.preference?.region ?? null,
-        };
+        const { score, reasons } = scoreCandidate(c, criteria);
+        return { ...c, score, reasons };
       })
-      .filter((c) => c.score > 0)
+      .filter((r) => r.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, 10);
 
-    // Generate AI-style summary
-    const criteriaDesc: string[] = [];
-    if (criteria.gender) criteriaDesc.push(criteria.gender === "male" ? "男生" : "女生");
-    if (criteria.ageMin || criteria.ageMax) {
-      const min = criteria.ageMin ?? "?";
-      const max = criteria.ageMax ?? "?";
-      criteriaDesc.push(`${min}-${max}岁`);
-    }
-    if (criteria.region) criteriaDesc.push(criteria.region);
-    if (criteria.interests.length > 0) criteriaDesc.push(`喜欢${criteria.interests.join("、")}`);
-    if (criteria.personalities.length > 0) criteriaDesc.push(`性格${criteria.personalities.join("、")}`);
-
-    const summary = scored.length > 0
-      ? `为你找到了 ${scored.length} 位符合「${criteriaDesc.join("，") || query}」的用户 💕`
-      : `抱歉，暂时没有找到完全符合「${criteriaDesc.join("，") || query}」的用户，试试换个描述？`;
+    const aiSummary =
+      scored.length > 0
+        ? `找到 ${scored.length} 个符合"${explanation}"的人：`
+        : `没有找到完全符合"${explanation}"的人，试试放宽条件？`;
 
     return NextResponse.json({
-      code: 0,
-      data: {
-        query,
-        criteria: criteriaDesc,
-        summary,
-        matches: scored,
-        total: scored.length,
-      },
+      results: scored.map((r) => ({
+        id: r.id,
+        name: r.name,
+        age: r.age,
+        gender: r.gender,
+        bio: r.bio,
+        avatarUrl: r.avatarUrl,
+        photo1: r.photo1,
+        matchScore: r.score,
+        matchReasons: r.reasons,
+        region: r.region,
+      })),
+      explanation: aiSummary,
+      criteria,
+      query,
     });
   } catch (err) {
-    console.error("[search] error", err);
-    return NextResponse.json({ code: -1, msg: "搜索出错，请稍后重试" }, { status: 500 });
+    console.error("Search API error:", err);
+    return NextResponse.json({ error: "搜索出错了，请稍后再试" }, { status: 500 });
   }
 }
